@@ -68,7 +68,7 @@
   function renderResumeItem(titleHTML, duration, highlights, extraHTML) {
     const L = [];
     L.push('<section class="resume-item" draggable="true">');
-    L.push('<div class="resume-item-tools" contenteditable="false" draggable="true" title="拖动整段经历排序"><span>拖动</span></div>');
+    L.push('<div class="resume-item-tools" contenteditable="false" draggable="true" title="拖动整段经历排序" aria-label="拖动整段经历排序"><span></span><span></span><span></span></div>');
     L.push('<div class="resume-meta-row"><div>' + titleHTML + '</div><time>' + escHTML(duration || '') + '</time></div>');
     if (extraHTML) L.push(extraHTML);
     if (highlights && highlights.length) {
@@ -928,6 +928,7 @@
       });
     });
     on('followupGo', 'click', handleFollowupRefine);
+    setupFollowupReveal();
 
     // Editor mouseup → track selection
     document.addEventListener('mouseup', () => {
@@ -990,6 +991,21 @@
     });
   }
 
+  function setupFollowupReveal() {
+    const panel = document.querySelector('.ai-followup-panel');
+    if (!panel) return;
+    if (!('IntersectionObserver' in window)) {
+      panel.classList.add('is-visible');
+      return;
+    }
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) panel.classList.add('is-visible');
+      });
+    }, { threshold: 0.18 });
+    observer.observe(panel);
+  }
+
   // ── API Key ──
   function openAPIKeyModal() { document.getElementById('apiKeyInput').value = AIService.getApiKey(); document.getElementById('apiKeyModal').style.display = 'flex'; }
   function closeAPIKeyModal() { document.getElementById('apiKeyModal').style.display = 'none'; }
@@ -1045,13 +1061,13 @@
     const btn = document.getElementById('generateBtn');
     btn.disabled = true; btn.textContent = '⏳ 分析中…';
     if (state.resumeZH || state.resumeEN) saveSnapshot('生成前备份');
-    setGenerateProgress(12, '正在整理岗位和经历素材，预计 30-60 秒。可以去接杯水，但别跑太远。');
+    setGenerateProgress(12, '正在整理岗位和经历素材，预计 30-60 秒。可以去接杯水，但别跑太远。', false, '整理素材…');
 
     try {
       startGenerateProgressLoop();
       const result = await AIService.generateResume({ jd: effectiveJD, experiences: experiencesForAI, requirements: state.requirements });
       stopGenerateProgressLoop();
-      setGenerateProgress(68, '正在解析 AI 返回结果…');
+      setGenerateProgress(68, '正在解析 AI 返回结果…', false, '解析结果…');
       if (result.raw) {
         showToast('AI 返回了非标准格式', 'warning');
         state.resumeZH = normalizeResume(result.raw);
@@ -1062,11 +1078,11 @@
         if (!state.resumeZH) state.resumeZH = normalizeResume(result);
       }
       if (!state.resumeZH) throw new Error('AI 返回内容不完整，请重试一次或减少英文/无关素材。');
-      setGenerateProgress(82, '正在排版到 A4 预览…');
+      setGenerateProgress(82, '正在排版到 A4 预览…', false, '排版中…');
       clearEditorDrafts();
       switchView('edit');
       renderEditor(); renderPreview();
-      setGenerateProgress(88, '正在把内容自动铺满 A4，一杯咖啡的最后几口。');
+      setGenerateProgress(88, '正在把内容自动铺满 A4，一杯咖啡的最后几口。', false, '压实 A4…');
       startAutoFillProgressLoop();
       const fill = checkPageFill();
       if (fill.needsFill) {
@@ -1075,7 +1091,7 @@
       stopGenerateProgressLoop();
       saveSnapshot(state.jdTitle ? '岗位: ' + state.jdTitle : '初始生成');
       persistResumeState();
-      setGenerateProgress(100, '生成完成，已默认整理成一页 A4。');
+      setGenerateProgress(100, '生成完成，已默认整理成一页 A4。', false, '生成完成');
       setTimeout(() => setGenerateProgress(0, ''), 700);
       showToast('简历生成完成！', 'success');
     } catch (err) {
@@ -1101,13 +1117,14 @@
     }
   }
 
-  function setGenerateProgress(percent, message, isHTML) {
+  function setGenerateProgress(percent, message, isHTML, buttonText) {
     const progress = document.getElementById('generateProgress');
     const bar = document.getElementById('generateProgressBar');
     const status = document.getElementById('generateStatus');
     const editingProgress = document.getElementById('editingProgress');
     const editingBar = document.getElementById('editingProgressBar');
     const editingText = document.getElementById('editingProgressText');
+    const generateBtn = document.getElementById('generateBtn');
     const pct = Math.max(0, Math.min(100, percent || 0));
     if (progress && bar && status) {
       progress.style.display = pct > 0 ? 'block' : 'none';
@@ -1120,29 +1137,34 @@
       editingBar.style.width = pct + '%';
       editingText.textContent = stripHTML(message || '') || '正在处理简历内容，可以先去喝口咖啡。';
     }
+    if (generateBtn && state.isGenerating && buttonText) {
+      generateBtn.textContent = buttonText;
+    }
     updateGenerationStage(isHTML ? stripHTML(message || '') : message);
   }
 
   function startGenerateProgressLoop() {
     const copy = [
-      '正在拆经历事实：AI 现在像 HR 一样挑重点，稍微有点挑剔。',
-      '正在把不相关经历翻译成可迁移能力，不浪费你任何一段努力。',
-      '正在给 bullet 补 STAR，不是拖延，是在给简历长肌肉。',
-      '正在压实 A4 版面，让它看起来不是“刚毕业的空白感”。',
-      '最后检查时间、排序和一页密度，咖啡可以喝到第三口了。'
+      { text: '正在拆经历事实：AI 现在像 HR 一样挑重点，稍微有点挑剔。', button: '拆事实…' },
+      { text: '正在找岗位关键词：把经历往 JD 真正在意的能力上靠。', button: '匹配 JD…' },
+      { text: '正在把不相关经历翻译成可迁移能力，不浪费你任何一段努力。', button: '重组经历…' },
+      { text: '正在给 bullet 补 STAR，不是拖延，是在给简历长肌肉。', button: '补 STAR…' },
+      { text: '正在检查实习、项目和校园经历的排序，最近且相关的放前面。', button: '排顺序…' },
+      { text: '正在压实 A4 版面，让它看起来不是“刚毕业的空白感”。', button: '压版面…' },
+      { text: '如果这里久一点，是在守住事实边界，不乱编公司、时间和数据。', button: '事实校验…' }
     ];
-    startProgressDrip({ startPct: 18, maxPct: 76, messages: copy, tickMs: 850, messageMs: 12000 });
+    startProgressDrip({ startPct: 18, maxPct: 76, messages: copy, tickMs: 850, messageMs: 5200 });
   }
 
   function startAutoFillProgressLoop() {
     const copy = [
-      '正在把内容压进一页 A4：先别急，它在和版面较劲。',
-      '这一段稍微久一点：正在检查每条经历是不是接近两行、又不显得啰嗦。',
-      '还在微调密度：让实习和项目更饱满，尽量少用技能/概述凑数。',
-      '正在做最后版面巡检：照片、标题、日期和 bullet 都要站好队。',
-      '快好了：现在是在确认预览和导出的 PDF 尽量长得一模一样。'
+      { text: '正在把内容压进一页 A4：先别急，它在和版面较劲。', button: '压实 A4…' },
+      { text: '这一段稍微久一点：正在检查每条经历是不是接近两行、又不显得啰嗦。', button: '控行中…' },
+      { text: '还在微调密度：让实习和项目更饱满，尽量少用技能/概述凑数。', button: '补密度…' },
+      { text: '正在做最后版面巡检：照片、标题、日期和 bullet 都要站好队。', button: '巡检中…' },
+      { text: '快好了：现在是在确认预览和导出的 PDF 尽量长得一模一样。', button: '核对导出…' }
     ];
-    startProgressDrip({ startPct: 88, maxPct: 96, messages: copy, tickMs: 900, messageMs: 7000 });
+    startProgressDrip({ startPct: 88, maxPct: 96, messages: copy, tickMs: 900, messageMs: 5200 });
   }
 
   function startProgressDrip(options) {
@@ -1157,7 +1179,10 @@
       const elapsed = Date.now() - startedAt;
       const pct = Math.min(maxPct, startPct + Math.floor(elapsed / tickMs));
       const idx = Math.min(messages.length - 1, Math.floor(elapsed / messageMs));
-      setGenerateProgress(pct, messages[idx]);
+      const current = messages[idx] || {};
+      const text = typeof current === 'string' ? current : current.text;
+      const button = typeof current === 'string' ? '' : current.button;
+      setGenerateProgress(pct, text, false, button);
     }, tickMs);
   }
 

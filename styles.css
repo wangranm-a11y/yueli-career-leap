@@ -636,6 +636,11 @@ textarea, input { font-family: inherit; }
 .view-history {
   padding-top: 56px;
 }
+.view-editing {
+  min-height: 100vh;
+  overflow-y: auto;
+  background: var(--bg);
+}
 
 .edit-toolbar {
   display: flex;
@@ -682,6 +687,7 @@ textarea, input { font-family: inherit; }
   display: grid !important;
   grid-template-columns: 1fr 1fr !important;
   height: calc(100vh - 56px - 44px);
+  min-height: 680px;
   overflow: hidden;
 }
 .edit-left, .edit-right {
@@ -750,6 +756,8 @@ textarea, input { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
+  gap: 3px;
   position: absolute;
   left: 1px;
   top: 5px;
@@ -764,8 +772,13 @@ textarea, input { font-family: inherit; }
   cursor: grab;
   pointer-events: auto;
   user-select: none;
-  writing-mode: vertical-rl;
   line-height: 1;
+}
+.resume-item-tools span {
+  display: block;
+  width: 10px;
+  height: 2px;
+  background: currentColor;
 }
 .resume-item-tools:active { cursor: grabbing; }
 .resume-item:hover .resume-item-tools {
@@ -975,6 +988,7 @@ textarea, input { font-family: inherit; }
 
 @media (max-width: 900px) {
   .edit-split { grid-template-columns: 1fr !important; }
+  .ai-followup-panel { width: calc(100% - 24px); margin: 18px auto 28px; }
 }
 
 /* ── Resume Layout (Professional single-column, WonderCV style) ── */
@@ -1283,12 +1297,26 @@ textarea, input { font-family: inherit; }
 }
 
 .ai-followup-panel {
-  margin: 14px 20px 20px;
-  padding: 14px;
+  margin: 28px auto 40px;
+  padding: 18px;
+  width: min(1180px, calc(100% - 48px));
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 0;
   background: var(--bg-card);
   box-shadow: var(--shadow-sm);
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity .28s ease, transform .28s ease;
+}
+.ai-followup-panel.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (max-width: 900px) {
+  .ai-followup-panel {
+    width: calc(100% - 24px);
+    margin: 18px auto 28px;
+  }
 }
 .ai-followup-panel strong {
   font-size: 14px;
