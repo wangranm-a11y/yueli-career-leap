@@ -38,6 +38,7 @@
 
   const PAGE_FILL_TARGET = 98;
   const AUTO_FILL_MIN_INPUT_CHARS = 100;
+  const RESUME_STORAGE_KEY = 'yueli_resume_state_v1';
 
   // ── Safe DOM helpers ──
   function $(s) { return document.querySelector(s); }
@@ -480,17 +481,93 @@
     setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 3000);
   }
 
-  // ── State persistence ──
-  function loadState() { state.apiKey = AIService.getApiKey(); }
-  function savePrefs() { localStorage.setItem('cs_prefs', JSON.stringify({ theme: state.theme })); }
-
   function hasResumeContent() {
     return !!(
       state.resumeZH ||
       state.resumeEN ||
-      state.editorHTML.zh ||
-      state.editorHTML.en
+      (state.editorHTML.zh && !state.editorHTML.zh.includes('resume-empty-state')) ||
+      (state.editorHTML.en && !state.editorHTML.en.includes('resume-empty-state'))
     );
+  }
+
+  // ── State persistence ──
+  function loadState() {
+    state.apiKey = AIService.getApiKey();
+    try {
+      const prefs = JSON.parse(localStorage.getItem('cs_prefs') || '{}');
+      if (prefs.theme) state.theme = prefs.theme;
+    } catch (e) {}
+    return restoreResumeState();
+  }
+
+  function savePrefs() { localStorage.setItem('cs_prefs', JSON.stringify({ theme: state.theme })); }
+
+  function persistResumeState() {
+    if (!hasResumeContent()) return;
+    try {
+      localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify({
+        resumeZH: state.resumeZH,
+        resumeEN: state.resumeEN,
+        editorHTML: state.editorHTML,
+        effectiveJD: state.effectiveJD,
+        jdTitle: state.jdTitle,
+        jd: state.jd,
+        currentLang: state.currentLang,
+        theme: state.theme,
+        versions: state.versions.slice(-12),
+        currentVersionIdx: Math.min(state.currentVersionIdx, 11),
+        photoDataUrl: state.photoDataUrl,
+        sourceName: state.sourceName,
+        sourceProfile: state.sourceProfile,
+        manualProfile: state.manualProfile,
+        savedAt: new Date().toISOString()
+      }));
+    } catch (e) {
+      console.warn('Persist resume state failed:', e);
+    }
+  }
+
+  function restoreResumeState() {
+    try {
+      const raw = localStorage.getItem(RESUME_STORAGE_KEY);
+      if (!raw) return false;
+      const saved = JSON.parse(raw);
+      const editorHTML = saved.editorHTML || {};
+      const hasSavedResume = !!(saved.resumeZH || saved.resumeEN || editorHTML.zh || editorHTML.en);
+      if (!hasSavedResume) return false;
+      state.resumeZH = saved.resumeZH || null;
+      state.resumeEN = saved.resumeEN || null;
+      state.editorHTML = {
+        zh: editorHTML.zh && !editorHTML.zh.includes('resume-empty-state') ? editorHTML.zh : '',
+        en: editorHTML.en && !editorHTML.en.includes('resume-empty-state') ? editorHTML.en : ''
+      };
+      state.effectiveJD = saved.effectiveJD || '';
+      state.jdTitle = saved.jdTitle || '';
+      state.jd = saved.jd || '';
+      state.currentLang = saved.currentLang || 'zh';
+      state.theme = saved.theme || state.theme;
+      state.versions = Array.isArray(saved.versions) ? saved.versions : [];
+      state.currentVersionIdx = Number.isInteger(saved.currentVersionIdx) ? saved.currentVersionIdx : state.versions.length - 1;
+      state.photoDataUrl = saved.photoDataUrl || '';
+      state.sourceName = saved.sourceName || '';
+      state.sourceProfile = saved.sourceProfile || state.sourceProfile;
+      state.manualProfile = saved.manualProfile || state.manualProfile;
+      return hasResumeContent();
+    } catch (e) {
+      console.warn('Restore resume state failed:', e);
+      localStorage.removeItem(RESUME_STORAGE_KEY);
+      return false;
+    }
+  }
+
+  function validateVisibleView() {
+    const editingVisible = document.getElementById('viewEditing')?.style.display !== 'none';
+    const resultVisible = editingVisible ||
+      document.getElementById('viewScore')?.style.display !== 'none' ||
+      document.getElementById('viewHistory')?.style.display !== 'none';
+    if (resultVisible && !state.isGenerating && !hasResumeContent()) {
+      switchView('input');
+    }
   }
 
   // ── File handlers (MUST run first, independent of everything) ──
@@ -774,6 +851,7 @@
         saveCurrentEditorDraft();
         renderPreview();
         checkPageFill();
+        persistResumeState();
       }, 400));
     }
 
@@ -888,6 +966,7 @@
         await autoFillToFit(4, { silent: true });
       }
       saveSnapshot(state.jdTitle ? '岗位: ' + state.jdTitle : '初始生成');
+      persistResumeState();
       setGenerateProgress(100, '生成完成，已默认整理成一页 A4。');
       setTimeout(() => setGenerateProgress(0, ''), 700);
       showToast('简历生成完成！', 'success');
@@ -1274,6 +1353,7 @@
         }
         saveCurrentEditorDraft();
         renderPreview(); checkPageFill();
+        persistResumeState();
         state.selectedRange = null;
         document.getElementById('rewritePopover').style.display = 'none';
         showToast('改写完成', 'success');
@@ -1308,6 +1388,7 @@
       state.effectiveJD = newJD;
       clearEditorDrafts();
       saveSnapshot('新JD精修');
+      persistResumeState();
       renderEditor(); renderPreview(); checkPageFill();
       showToast('精修完成', 'success');
     } catch (err) { console.error(err); showToast('精修失败', 'error'); }
@@ -1357,6 +1438,7 @@
       label
     });
     state.currentVersionIdx = state.versions.length - 1;
+    persistResumeState();
   }
 
   function renderHistory() {
@@ -1379,6 +1461,7 @@
     state.editorHTML = v.editorHTML ? JSON.parse(JSON.stringify(v.editorHTML)) : { zh: '', en: '' };
     state.effectiveJD = v.effectiveJD || state.effectiveJD;
     saveSnapshot('恢复: ' + v.label);
+    persistResumeState();
     renderEditor(); renderPreview(); checkPageFill(); renderHistory();
     showToast('已恢复', 'success');
   }
@@ -1435,16 +1518,34 @@
     state.currentLang = lang;
     $$('.et-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === lang));
     renderEditor(); renderPreview(); checkPageFill();
+    persistResumeState();
   }
 
   // ── Init ──
   function init() {
     setupFileHandlers();
-    try { loadState(); setupEventListeners(); checkAPIKey(); }
+    try {
+      const restored = loadState();
+      setupEventListeners();
+      checkAPIKey();
+      if (restored) {
+        switchView('edit');
+        showToast('已恢复上次生成的简历', 'success');
+      } else {
+        validateVisibleView();
+      }
+    }
     catch (e) { console.error('Init error:', e); }
   }
 
   document.addEventListener('DOMContentLoaded', init);
+  window.addEventListener('pageshow', () => {
+    setTimeout(validateVisibleView, 0);
+  });
+  window.addEventListener('beforeunload', () => {
+    saveCurrentEditorDraft();
+    persistResumeState();
+  });
 
   // Global keyboard: Cmd+Shift+R for AI rewrite
   document.addEventListener('keydown', e => {
