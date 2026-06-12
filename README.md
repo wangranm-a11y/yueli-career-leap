@@ -34,6 +34,7 @@
 - CSS
 - Vanilla JavaScript
 - DeepSeek Chat Completions API
+- Vercel Serverless Function API proxy
 - pdf.js
 - mammoth.js
 - Tesseract.js
@@ -57,12 +58,15 @@ This project is a static website and can be deployed to Vercel, Netlify, GitHub 
 Vercel:
 
 ```bash
+npx vercel@latest env add DEEPSEEK_API_KEY production
 npx vercel@latest --prod
 ```
 
 ## Privacy
 
-DeepSeek API Key is saved in the user's browser `localStorage` only. It is not included in the source code and is not uploaded to this static site.
+The production site can use `DEEPSEEK_API_KEY` from Vercel environment variables through a serverless proxy. The key is not included in the source code and is not exposed to the browser.
+
+Users can still optionally provide their own DeepSeek API Key in the browser. That custom key is saved in `localStorage` only.
 
 Uploaded resume files are parsed in the browser. The extracted text is sent to the model only when the user generates or rewrites a resume.
 

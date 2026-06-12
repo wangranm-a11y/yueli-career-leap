@@ -2473,3 +2473,14 @@ body {
   margin-top: 260px;
   text-align: center;
 }
+
+/* v36: make the hero/form separation explicit */
+.input-hero {
+  margin-bottom: 24px;
+}
+.input-grid--identity {
+  margin-top: 0;
+}
+#startForm {
+  margin-top: 26px !important;
+}

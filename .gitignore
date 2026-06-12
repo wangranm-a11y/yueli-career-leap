@@ -2,5 +2,7 @@
 .vercel
 *.log
 *.zip
+.env
+.env.*
 2026-06-09-234310-hello.txt
 font-board.html

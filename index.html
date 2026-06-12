@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=35">
+  <link rel="stylesheet" href="styles.css?v=37">
 </head>
 <body>
 
@@ -28,7 +28,7 @@
       <option value="modern">极简现代</option>
       <option value="creative">创意设计</option>
     </select>
-    <button id="apiKeyBtn" class="tb-btn" title="API Key 设置">Key</button>
+    <button id="apiKeyBtn" class="tb-btn" title="可选：使用自己的 API Key">Key</button>
     <button id="downloadBtn" class="tb-btn tb-btn-primary" style="display:none">下载 PDF</button>
   </div>
 </header>
@@ -36,14 +36,14 @@
 <!-- ====== API Key Modal ====== -->
 <div class="modal-overlay" id="apiKeyModal" style="display:none">
   <div class="modal-card">
-    <h3>设置 API Key</h3>
-    <p class="modal-hint">使用 DeepSeek API（<a href="https://platform.deepseek.com/api_keys" target="_blank">获取 Key</a>）<br>Key 仅存储在你的浏览器本地，不会上传到任何服务器。</p>
+    <h3>自定义 API Key（可选）</h3>
+    <p class="modal-hint">网站默认使用服务器配置的 DeepSeek Key。只有当你想使用自己的额度时，才需要在这里填写。<br>自定义 Key 仅存储在你的浏览器本地，不会上传到任何服务器。</p>
     <input type="password" id="apiKeyInput" class="modal-input" placeholder="sk-...">
     <div class="modal-actions">
       <button class="btn-cancel" id="apiKeyCancel">取消</button>
       <button class="btn-confirm" id="apiKeySave">保存</button>
     </div>
-    <p class="modal-footnote">当前使用 DeepSeek V4-Pro，优先保证改写质量</p>
+    <p class="modal-footnote">留空也可以正常使用；公开仓库不会包含任何私密 Key。</p>
   </div>
 </div>
 
@@ -119,7 +119,7 @@
           <span class="input-required">必填</span>
         </div>
         <div class="profile-grid">
-          <input type="text" id="profileNameInput" class="input-text" placeholder="姓名，如：张三 / 张三 Jane">
+          <input type="text" id="profileNameInput" class="input-text" placeholder="姓名，如：张三 / Zhang San">
           <input type="text" id="profilePhoneInput" class="input-text" placeholder="手机号（可选）">
           <input type="email" id="profileEmailInput" class="input-text" placeholder="邮箱（可选）">
           <input type="text" id="profileLinkInput" class="input-text" placeholder="LinkedIn / 作品集主页（可选）">
@@ -191,8 +191,8 @@
         </div>
         <div class="file-drop-zone" id="fileDropZone">
           <div class="file-drop-icon">+</div>
-          <div class="file-drop-text">拖拽一组文件到这里，或点击批量上传</div>
-          <div class="file-drop-formats">可一次选择多个 PDF、DOCX、TXT、MD；照片请在下方单独上传</div>
+          <div class="file-drop-text">拖拽文件到这里，或点击选择素材</div>
+          <div class="file-drop-formats">支持一次选择多个 PDF、DOCX、TXT、MD；照片请在上方单独上传</div>
           <input type="file" id="fileInput" multiple accept=".pdf,.docx,.txt,.md" style="display:none">
         </div>
         <div id="fileList" class="file-list"></div>
@@ -281,12 +281,17 @@
       </div>
       <div class="quick-actions">
         <button class="btn-chip" data-followup="让表达更像产品经理：突出用户洞察、需求拆解、数据分析、跨团队推进和项目闭环，但不要编造事实">更像产品经理</button>
+        <button class="btn-chip" data-followup="让表达更像运营岗位：突出用户增长、活动策划、社群维护、内容转化、数据复盘和执行闭环，但不要编造事实">更像运营</button>
+        <button class="btn-chip" data-followup="让表达更像市场岗位：突出品牌传播、活动营销、资源整合、用户洞察、项目落地和传播效果，但不要编造事实">更像市场</button>
+        <button class="btn-chip" data-followup="让表达更像咨询/战略岗位：突出问题拆解、行业研究、竞品分析、逻辑结构、商业判断和结论输出，但不要编造事实">更像咨询</button>
+        <button class="btn-chip" data-followup="让表达更像数据分析岗位：突出指标定义、数据处理、分析方法、洞察输出、业务建议和结果验证，但不要编造事实">更像数据分析</button>
         <button class="btn-chip" data-followup="把能量化的成果写得更数据化：优先使用素材中已有数字，没有数字就写清对象、方法和可验证产出，不要硬编数据">更数据化</button>
         <button class="btn-chip" data-followup="整体语言更简洁：保留核心事实和结果，删掉空泛形容词，保持一页 A4 信息密度">更简洁</button>
+        <button class="btn-chip" data-followup="整体表达更专业克制：减少夸张形容词，强化事实、动作、结果和岗位能力，不要编造内容">更专业</button>
         <button class="btn-chip" data-followup="更适合校招：突出学习能力、校园/实习项目中的主动性、基础技能、潜力和岗位匹配度，不夸大资历">更适合校招</button>
       </div>
       <div class="followup-row">
-        <textarea id="followupInput" class="followup-input" rows="2" placeholder="例如：把 ZooNotFound 那段写得更像产品经理，语气专业一点。"></textarea>
+        <textarea id="followupInput" class="followup-input" rows="2" placeholder="例如：把第一段实习写得更数据化，语气专业一点。"></textarea>
         <button class="btn-sm btn-sm-primary" id="followupGo">继续优化</button>
       </div>
     </div>
@@ -313,8 +318,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="ai-service.js?v=35"></script>
-  <script src="resume-renderer.js?v=35"></script>
-  <script src="app.js?v=35"></script>
+  <script src="ai-service.js?v=37"></script>
+  <script src="resume-renderer.js?v=37"></script>
+  <script src="app.js?v=37"></script>
 </body>
 </html>

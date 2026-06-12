@@ -7,6 +7,7 @@
   'use strict';
 
   const DEEPSEEK_BASE = 'https://api.deepseek.com/v1';
+  const DEEPSEEK_PROXY = '/api/deepseek';
   const DEFAULT_MODEL = 'deepseek-v4-pro';  // V4-Pro — much better at creative rewriting
   const PRO_MODEL = 'deepseek-v4-pro';
   let lastParseMeta = {};
@@ -77,7 +78,6 @@
 
   async function callDeepSeek({ model = DEFAULT_MODEL, systemPrompt, userMessage, temperature = 0.7, maxTokens = 8192, jsonMode = true }) {
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error('API_KEY_MISSING');
 
     const isReasoner = model === 'deepseek-reasoner';
     const body = {
@@ -98,11 +98,11 @@
 
     let response;
     try {
-      response = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
+      response = await fetch(apiKey ? `${DEEPSEEK_BASE}/chat/completions` : DEEPSEEK_PROXY, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+          ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
         },
         body: JSON.stringify(body),
         signal: controller.signal
@@ -116,7 +116,7 @@
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      if (response.status === 401) throw new Error('API_KEY_INVALID');
+      if (response.status === 401) throw new Error(apiKey ? 'API_KEY_INVALID' : 'SERVER_API_KEY_INVALID');
       if (response.status === 429) throw new Error('API_RATE_LIMIT');
       throw new Error(error.error?.message || `API error: ${response.status}`);
     }
@@ -166,6 +166,10 @@
   }
 
   function hasApiKey() {
+    return true;
+  }
+
+  function hasUserApiKey() {
     return !!getApiKey();
   }
 
@@ -566,6 +570,7 @@
     getApiKey,
     setApiKey,
     hasApiKey,
+    hasUserApiKey,
     parseFile,
     getLastParseMeta() { return { ...lastParseMeta }; },
     preprocessExperiences,

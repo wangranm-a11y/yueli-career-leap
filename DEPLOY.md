@@ -4,6 +4,14 @@
 
 ## Vercel 一键部署
 
+先在 Vercel 配置服务器环境变量，避免把 DeepSeek Key 暴露在前端代码里：
+
+```bash
+npx vercel@latest env add DEEPSEEK_API_KEY production
+```
+
+然后部署：
+
 ```bash
 cd resume-tool
 npx vercel@latest login
@@ -24,4 +32,5 @@ npx vercel@latest --prod --yes
 
 ## 隐私说明
 
-DeepSeek API Key 仅保存在用户浏览器 localStorage 中，不会随静态站点一起上传。
+线上默认使用 Vercel 环境变量 `DEEPSEEK_API_KEY`，不会暴露在 GitHub 或前端代码里。
+如果用户在页面里填写自己的 DeepSeek API Key，该 Key 仅保存在用户浏览器 localStorage 中。

@@ -809,7 +809,14 @@
   function closeAPIKeyModal() { document.getElementById('apiKeyModal').style.display = 'none'; }
   function saveAPIKey() {
     const key = document.getElementById('apiKeyInput').value.trim();
-    if (!key) { showToast('请输入 API Key', 'warning'); return; }
+    if (!key) {
+      AIService.setApiKey('');
+      state.apiKey = '';
+      document.getElementById('apiKeyBtn')?.classList.remove('needs-key');
+      closeAPIKeyModal();
+      showToast('已使用网站默认 Key', 'success');
+      return;
+    }
     if (!key.startsWith('sk-')) { showToast('Key 应以 sk- 开头', 'warning'); return; }
     AIService.setApiKey(key); state.apiKey = key;
     document.getElementById('apiKeyBtn')?.classList.remove('needs-key');
@@ -817,7 +824,7 @@
   }
   function checkAPIKey() {
     const btn = document.getElementById('apiKeyBtn');
-    if (btn && !AIService.hasApiKey()) btn.classList.add('needs-key');
+    if (btn) btn.classList.toggle('needs-key', !!AIService.hasUserApiKey());
   }
 
   // ── Generate ──
@@ -888,8 +895,9 @@
       stopGenerateProgressLoop();
       console.error(err);
       let msg = err.message || '生成失败';
-      if (err.message === 'API_KEY_MISSING') { msg = '请先设置 API Key'; openAPIKeyModal(); }
-      else if (err.message === 'API_KEY_INVALID') { msg = 'Key 无效'; openAPIKeyModal(); }
+      if (err.message === 'API_KEY_MISSING') { msg = '站点还没有配置服务器 Key，请联系站点管理员'; }
+      else if (err.message === 'API_KEY_INVALID') { msg = '自定义 Key 无效'; openAPIKeyModal(); }
+      else if (err.message === 'SERVER_API_KEY_INVALID') { msg = '站点服务器 Key 无效，请联系站点管理员'; }
       setGenerateProgress(0, '<span style="color:#c7512e;">' + escHTML(msg) + '</span>', true);
       showToast(msg, 'error');
       if (hasResumeContent()) {
@@ -1275,8 +1283,9 @@
     } catch (err) {
       console.error(err);
       let msg = err.message || '改写失败';
-      if (err.message === 'API_KEY_MISSING') msg = '请先设置 API Key';
-      if (err.message === 'API_KEY_INVALID') msg = 'API Key 无效';
+      if (err.message === 'API_KEY_MISSING') msg = '站点还没有配置服务器 Key，请联系站点管理员';
+      if (err.message === 'API_KEY_INVALID') msg = '自定义 API Key 无效';
+      if (err.message === 'SERVER_API_KEY_INVALID') msg = '站点服务器 Key 无效，请联系站点管理员';
       showToast(msg, 'error');
     }
     finally { setRewriteBusy(false); }
