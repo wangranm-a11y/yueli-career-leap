@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跃历 — Career Leap Resume</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=34">
+</head>
+<body>
+
+<!-- ====== Top Bar ====== -->
+<header class="topbar">
+  <div class="topbar-left">
+    <span class="logo">跃历</span>
+    <span class="logo-sub">Career Leap</span>
+  </div>
+  <div class="topbar-center" id="viewTabs" style="display:none">
+    <button class="tb-tab active" data-view="edit">简历生成</button>
+    <button class="tb-tab" data-view="score">JD 匹配度</button>
+    <button class="tb-tab" data-view="history">历史版本</button>
+  </div>
+  <div class="topbar-right">
+    <select id="themeSelect" class="tb-select" style="display:none">
+      <option value="professional">专业商务</option>
+      <option value="modern">极简现代</option>
+      <option value="creative">创意设计</option>
+    </select>
+    <button id="apiKeyBtn" class="tb-btn" title="API Key 设置">Key</button>
+    <button id="downloadBtn" class="tb-btn tb-btn-primary" style="display:none">下载 PDF</button>
+  </div>
+</header>
+
+<!-- ====== API Key Modal ====== -->
+<div class="modal-overlay" id="apiKeyModal" style="display:none">
+  <div class="modal-card">
+    <h3>设置 API Key</h3>
+    <p class="modal-hint">使用 DeepSeek API（<a href="https://platform.deepseek.com/api_keys" target="_blank">获取 Key</a>）<br>Key 仅存储在你的浏览器本地，不会上传到任何服务器。</p>
+    <input type="password" id="apiKeyInput" class="modal-input" placeholder="sk-...">
+    <div class="modal-actions">
+      <button class="btn-cancel" id="apiKeyCancel">取消</button>
+      <button class="btn-confirm" id="apiKeySave">保存</button>
+    </div>
+    <p class="modal-footnote">当前使用 DeepSeek V4-Pro，优先保证改写质量</p>
+  </div>
+</div>
+
+<!-- ====== AI Rewrite Popover ====== -->
+<div class="rewrite-popover" id="rewritePopover" style="display:none">
+  <input type="text" class="rewrite-input" id="rewriteInput" placeholder="输入修改要求，如：更强调数据成果 / 语气更简洁">
+  <div class="rewrite-progress" id="rewriteProgress" style="display:none"><span></span></div>
+  <div class="rewrite-actions">
+    <button class="btn-cancel" id="rewriteCancel">取消</button>
+    <button class="btn-confirm" id="rewriteGo">改写</button>
+  </div>
+</div>
+
+<!-- ====== JD Refine Modal ====== -->
+<div class="modal-overlay" id="refineModal" style="display:none">
+  <div class="modal-card">
+    <h3>针对新 JD 精修</h3>
+    <p class="modal-hint">粘贴新的岗位 JD，AI 将在现有简历基础上做针对性调整</p>
+    <textarea id="refineJDInput" class="modal-textarea" rows="6" placeholder="粘贴新 JD…"></textarea>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="refineCancel">取消</button>
+      <button class="btn-confirm" id="refineGo">开始精修</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== Main Layout ====== -->
+<main class="main-container">
+
+  <!-- ── Input View ── -->
+  <section class="view view-input" id="viewInput">
+    <section class="input-hero">
+      <div class="hero-marquee">
+        <h1>跃历</h1>
+        <div class="hero-copy">
+          <span class="hero-kicker">Career Leap</span>
+          <p class="hero-slogan">从零散经历到高匹配简历，只差一次跃历。</p>
+          <p class="hero-desc">上传已有简历、经历素材和目标岗位，AI 先守住事实，再重组表达、补足 STAR，生成一页能投递的 A4 简历。</p>
+        </div>
+      </div>
+      <div class="hero-visual" aria-label="跃历生成前后示意">
+        <article class="visual-panel visual-panel--source">
+          <span>原始经历</span>
+          <p>负责社群活动，做过用户沟通和内容发布。</p>
+          <p>在实习里参与竞品分析，整理过一些资料。</p>
+        </article>
+        <article class="visual-panel visual-panel--resume">
+          <div class="mini-resume-head">
+            <b>高匹配 A4 简历</b>
+            <span class="resume-badges"><em>ONE PAGE A4</em><em>JD MATCH</em></span>
+          </div>
+          <div class="mini-section">
+            <strong>实习经历</strong>
+            <p>用户运营: 围绕活动转化目标搭建社群预热、报名提醒与复盘链路，体现用户洞察与项目闭环能力。</p>
+            <p>竞品分析: 从定位、功能和转化路径拆解同类产品，为需求判断和优先级提供依据。</p>
+          </div>
+        </article>
+        <article class="visual-panel visual-panel--facts">
+          <span>FACT FIRST</span>
+          <p>不编造公司、时间、奖项和数据。把真实经历翻译成岗位听得懂的证据。</p>
+        </article>
+      </div>
+      <div class="hero-actions">
+        <span>FACT FIRST</span>
+        <a class="hero-cta" href="#startForm">开始生成</a>
+      </div>
+    </section>
+
+    <div class="input-grid input-grid--identity" id="startForm">
+      <div class="input-card input-card--profile">
+        <div class="input-card-header">
+          <h2>个人信息</h2>
+          <span class="input-required">必填</span>
+        </div>
+        <div class="profile-grid">
+          <input type="text" id="profileNameInput" class="input-text" placeholder="姓名，如：张三 / 张三 Jane">
+          <input type="text" id="profilePhoneInput" class="input-text" placeholder="手机号（可选）">
+          <input type="email" id="profileEmailInput" class="input-text" placeholder="邮箱（可选）">
+          <input type="text" id="profileLinkInput" class="input-text" placeholder="LinkedIn / 作品集主页（可选）">
+        </div>
+      </div>
+      <div class="input-card input-card--photo">
+        <div class="input-card-header"><h2>简历照片（可选）</h2></div>
+        <div class="photo-upload-area" id="photoUploadArea">
+          <input type="file" id="photoInput" accept="image/*" style="display:none">
+          <div id="photoPreview" class="photo-preview">点击上传证件照</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-grid">
+      <!-- JD / Job Target Input -->
+      <div class="input-card input-card--jd">
+        <div class="input-card-header">
+          <h2>目标岗位</h2>
+          <span class="input-required">必填</span>
+        </div>
+        <!-- Mode switch -->
+        <div class="jd-mode-switch">
+          <label class="jd-mode-option">
+            <input type="radio" name="jdMode" value="title" checked>
+            <span>只输入岗位名称</span>
+          </label>
+          <label class="jd-mode-option">
+            <input type="radio" name="jdMode" value="full">
+            <span>粘贴完整 JD</span>
+          </label>
+        </div>
+        <!-- Mode: title only -->
+        <div class="jd-input-group" id="jdTitleGroup">
+          <input
+            type="text"
+            id="jdTitleInput"
+            class="input-text"
+            placeholder="输入你想投的岗位名称，如：产品经理、运营总监、市场策划…"
+          >
+          <p class="jd-hint">AI 会根据行业通用标准为你生成匹配的简历，无需完整 JD</p>
+        </div>
+        <!-- Mode: full JD -->
+        <div class="jd-input-group" id="jdFullGroup" style="display:none">
+          <textarea
+            id="jdInput"
+            class="input-textarea"
+            placeholder="把岗位 JD 粘贴到这里…&#10;&#10;例如：&#10;【岗位】产品经理&#10;【要求】3年以上互联网产品经验…"
+            rows="8"
+          ></textarea>
+          <div class="jd-image-upload">
+            <span class="jd-image-label">可直接上传 JD 截图，系统会自动识别文字：</span>
+            <input type="file" id="jdImageInput" accept="image/*" multiple style="display:none">
+            <button class="btn-sm" id="jdImageBtn">识别截图</button>
+            <div id="jdImagePreview" class="jd-image-preview"></div>
+          </div>
+        </div>
+        <div class="input-card-footer">
+          <span id="jdCharCount" class="char-count"></span>
+          <button class="btn-text" id="clearJD">清空</button>
+        </div>
+      </div>
+
+      <!-- Experience Input -->
+      <div class="input-card">
+        <div class="input-card-header">
+          <h2>经历素材</h2>
+          <span class="input-required">必填</span>
+        </div>
+        <div class="file-drop-zone" id="fileDropZone">
+          <div class="file-drop-icon">+</div>
+          <div class="file-drop-text">拖拽一组文件到这里，或点击批量上传</div>
+          <div class="file-drop-formats">可一次选择多个 PDF、DOCX、TXT、MD；照片请在下方单独上传</div>
+          <input type="file" id="fileInput" multiple accept=".pdf,.docx,.txt,.md" style="display:none">
+        </div>
+        <div id="fileList" class="file-list"></div>
+        <textarea
+          id="expInput"
+          class="input-textarea"
+          placeholder="或者直接在这里打字描述你的经历…&#10;&#10;例如：&#10;2023.6-2024.3 在XX公司做电商运营实习，主要负责…"
+          rows="8"
+        ></textarea>
+        <div class="input-card-footer">
+          <span id="charCount" class="char-count">0 字</span>
+          <button class="btn-text" id="clearExp">清空</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-grid input-grid--req">
+      <div class="input-card input-card--req">
+        <div class="input-card-header"><h2>特殊要求（可选）</h2></div>
+        <div class="fact-first-note">
+          <strong>事实优先</strong>
+          <span>AI 只会基于你提供的学校、公司、时间、奖项和数据来改写；不确定的信息会弱化表达，不会替你硬编。</span>
+        </div>
+        <textarea
+          id="reqInput"
+          class="input-textarea req-textarea"
+          placeholder="比如：强调管理经验、语言更像产品经理、不要太夸张、某段经历多写一点…&#10;作品集 / GitHub / Demo 链接也可以贴在这里，每行一个，AI 会把链接纳入简历。"
+          rows="6"
+        ></textarea>
+      </div>
+    </div>
+
+    <!-- Generate Button -->
+    <div class="generate-area">
+      <button id="generateBtn" class="btn-generate">生成简历</button>
+      <div class="generate-progress" id="generateProgress" style="display:none">
+        <div class="generate-progress-bar" id="generateProgressBar"></div>
+      </div>
+      <div id="generateStatus" class="generate-status"></div>
+    </div>
+  </section>
+
+  <!-- ── Editing View (Left editor + Right preview) ── -->
+  <section class="view view-editing" id="viewEditing" style="display:none">
+    <div class="edit-toolbar">
+      <button class="btn-sm" id="backToInputBtn">← 重新输入</button>
+      <div class="et-lang-tabs">
+        <button class="et-tab active" data-lang="zh">中文</button>
+        <button class="et-tab" data-lang="en">English</button>
+      </div>
+      <select id="themeSelect2" class="tb-select">
+        <option value="professional">专业商务</option>
+        <option value="modern">极简现代</option>
+        <option value="creative">创意暖色</option>
+      </select>
+      <span class="et-spacer"></span>
+      <button class="btn-sm" id="rewriteSelectedBtn">改写选中</button>
+      <button class="btn-sm" id="refineBtn">JD 精修</button>
+      <button class="btn-sm btn-sm-primary" id="downloadBtn2">下载 PDF</button>
+    </div>
+    <div class="edit-split">
+      <!-- Left: Editor -->
+      <div class="edit-left">
+        <div class="edit-left-label">编辑区 - 可直接修改文字；选中文字后会弹出 AI 改写输入框</div>
+        <div class="edit-left-content-wrapper">
+          <div id="editorArea" class="editor-area" contenteditable="true"></div>
+          <div id="fillPrompt" class="fill-prompt" style="display:none">
+            <p>AI 正在自动整理一页版面</p>
+            <button class="btn-sm" id="addMoreBtn">补充更多经历</button>
+            <button class="btn-sm" id="aiFillBtn">自动补满一页</button>
+          </div>
+        </div>
+      </div>
+      <!-- Right: Preview -->
+      <div class="edit-right">
+        <div class="edit-right-label">A4 预览</div>
+        <div class="preview-container" id="previewContainer">
+          <div class="preview-a4-page" id="previewA4"></div>
+        </div>
+      </div>
+    </div>
+    <div class="ai-followup-panel">
+      <div>
+        <strong>对这一版还不满意？</strong>
+        <span>再和 AI 聊聊，让它更懂你的需求。</span>
+      </div>
+      <div class="quick-actions">
+        <button class="btn-chip" data-followup="让表达更像产品经理：突出用户洞察、需求拆解、数据分析、跨团队推进和项目闭环，但不要编造事实">更像产品经理</button>
+        <button class="btn-chip" data-followup="把能量化的成果写得更数据化：优先使用素材中已有数字，没有数字就写清对象、方法和可验证产出，不要硬编数据">更数据化</button>
+        <button class="btn-chip" data-followup="整体语言更简洁：保留核心事实和结果，删掉空泛形容词，保持一页 A4 信息密度">更简洁</button>
+        <button class="btn-chip" data-followup="更适合校招：突出学习能力、校园/实习项目中的主动性、基础技能、潜力和岗位匹配度，不夸大资历">更适合校招</button>
+      </div>
+      <div class="followup-row">
+        <textarea id="followupInput" class="followup-input" rows="2" placeholder="例如：把 ZooNotFound 那段写得更像产品经理，语气专业一点。"></textarea>
+        <button class="btn-sm btn-sm-primary" id="followupGo">继续优化</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Score View ── -->
+  <section class="view view-score" id="viewScore" style="display:none">
+    <div class="score-panel" id="scoreContent"></div>
+  </section>
+
+  <!-- ── History View ── -->
+  <section class="view view-history" id="viewHistory" style="display:none">
+    <div class="history-panel" id="historyContent"></div>
+  </section>
+
+</main>
+
+<!-- ====== Toast ====== -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ====== Scripts ====== -->
+<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="ai-service.js?v=34"></script>
+  <script src="resume-renderer.js?v=34"></script>
+  <script src="app.js?v=34"></script>
+</body>
+</html>
