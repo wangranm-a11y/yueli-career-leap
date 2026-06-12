@@ -68,7 +68,7 @@
   function renderResumeItem(titleHTML, duration, highlights, extraHTML) {
     const L = [];
     L.push('<section class="resume-item" draggable="true">');
-    L.push('<div class="resume-item-tools" contenteditable="false" draggable="true" title="拖动整段经历排序" aria-label="拖动整段经历排序"><span></span><span></span><span></span></div>');
+    L.push('<div class="resume-item-tools" contenteditable="false" draggable="true" aria-label="拖动整段经历排序"><span></span><span></span><span></span></div>');
     L.push('<div class="resume-meta-row"><div>' + titleHTML + '</div><time>' + escHTML(duration || '') + '</time></div>');
     if (extraHTML) L.push(extraHTML);
     if (highlights && highlights.length) {
@@ -703,6 +703,28 @@
     return state.currentLang === 'en' ? 'en' : 'zh';
   }
 
+  function getResumeLabels() {
+    return state.currentLang === 'en'
+      ? {
+          education: 'Education',
+          experiences: 'Internship Experience',
+          projects: 'Project Experience',
+          campus: 'Entrepreneurial / Campus Experience',
+          links: 'Other Portfolio Links',
+          skills: 'Skills',
+          summary: 'Profile'
+        }
+      : {
+          education: '教育经历',
+          experiences: '实习经历',
+          projects: '项目经历',
+          campus: '创业/校园经历',
+          links: '其他作品链接',
+          skills: '技能',
+          summary: '个人概述'
+        };
+  }
+
   function saveCurrentEditorDraft() {
     const editor = document.getElementById('editorArea');
     if (!editor) return;
@@ -1061,7 +1083,7 @@
     const btn = document.getElementById('generateBtn');
     btn.disabled = true; btn.textContent = '⏳ 分析中…';
     if (state.resumeZH || state.resumeEN) saveSnapshot('生成前备份');
-    setGenerateProgress(12, '正在整理岗位和经历素材，预计 30-60 秒。可以去接杯水，但别跑太远。', false, '整理素材…');
+    setGenerateProgress(12, '正在整理岗位和经历素材，通常约 45 秒；可以去接杯水，但别跑太远。', false, '整理素材…');
 
     try {
       startGenerateProgressLoop();
@@ -1145,12 +1167,12 @@
 
   function startGenerateProgressLoop() {
     const copy = [
-      { text: '正在拆经历事实：AI 现在像 HR 一样挑重点，稍微有点挑剔。', button: '拆事实…' },
-      { text: '正在找岗位关键词：把经历往 JD 真正在意的能力上靠。', button: '匹配 JD…' },
-      { text: '正在把不相关经历翻译成可迁移能力，不浪费你任何一段努力。', button: '重组经历…' },
-      { text: '正在给 bullet 补 STAR，不是拖延，是在给简历长肌肉。', button: '补 STAR…' },
-      { text: '正在检查实习、项目和校园经历的排序，最近且相关的放前面。', button: '排顺序…' },
-      { text: '正在压实 A4 版面，让它看起来不是“刚毕业的空白感”。', button: '压版面…' },
+      { text: '约 10 秒：正在拆经历事实，AI 现在像 HR 一样挑重点，稍微有点挑剔。', button: '拆事实…' },
+      { text: '约 20 秒：正在找岗位关键词，把经历往 JD 真正在意的能力上靠。', button: '匹配 JD…' },
+      { text: '约 30 秒：正在把不相关经历翻译成可迁移能力，不浪费你任何一段努力。', button: '重组经历…' },
+      { text: '约 40 秒：正在给 bullet 补 STAR，不是拖延，是在给简历长肌肉。', button: '补 STAR…' },
+      { text: '半杯咖啡时间：正在检查实习、项目和校园经历排序，最近且相关的放前面。', button: '排顺序…' },
+      { text: '再等一小口咖啡：正在压实 A4 版面，让它看起来不是“刚毕业的空白感”。', button: '压版面…' },
       { text: '如果这里久一点，是在守住事实边界，不乱编公司、时间和数据。', button: '事实校验…' }
     ];
     startProgressDrip({ startPct: 18, maxPct: 76, messages: copy, tickMs: 850, messageMs: 5200 });
@@ -1158,10 +1180,10 @@
 
   function startAutoFillProgressLoop() {
     const copy = [
-      { text: '正在把内容压进一页 A4：先别急，它在和版面较劲。', button: '压实 A4…' },
-      { text: '这一段稍微久一点：正在检查每条经历是不是接近两行、又不显得啰嗦。', button: '控行中…' },
-      { text: '还在微调密度：让实习和项目更饱满，尽量少用技能/概述凑数。', button: '补密度…' },
-      { text: '正在做最后版面巡检：照片、标题、日期和 bullet 都要站好队。', button: '巡检中…' },
+      { text: '约 15 秒：正在把内容压进一页 A4，先别急，它在和版面较劲。', button: '压实 A4…' },
+      { text: '约 25 秒：正在检查每条经历是不是接近两行、又不显得啰嗦。', button: '控行中…' },
+      { text: '约 35 秒：还在微调密度，让实习和项目更饱满，尽量少用技能/概述凑数。', button: '补密度…' },
+      { text: '一杯咖啡的三分之一：照片、标题、日期和 bullet 都要站好队。', button: '巡检中…' },
       { text: '快好了：现在是在确认预览和导出的 PDF 尽量长得一模一样。', button: '核对导出…' }
     ];
     startProgressDrip({ startPct: 88, maxPct: 96, messages: copy, tickMs: 900, messageMs: 5200 });
@@ -1232,27 +1254,25 @@
     if (!el) return;
     const draft = state.editorHTML[getLangKey()];
     if (draft) { el.innerHTML = draft; return; }
-    if (!content && state.currentLang === 'en' && state.resumeZH) {
-      content = state.resumeZH;
-      showToast('英文版暂未生成，先显示中文版内容', 'info');
-    }
     if (!content) {
       el.innerHTML = [
         '<div class="resume-empty-state">',
-        '<strong>还没有生成简历</strong>',
-        '<p>先回到输入页填写目标岗位和经历素材，生成成功后这里会显示可编辑内容。</p>',
+        '<strong>' + (state.currentLang === 'en' ? 'English version is not ready yet' : '还没有生成简历') + '</strong>',
+        '<p>' + (state.currentLang === 'en' ? 'Click English again after the Chinese resume is generated; Career Leap will create a pure-text English version.' : '先回到输入页填写目标岗位和经历素材，生成成功后这里会显示可编辑内容。') + '</p>',
         '<button type="button" class="btn-sm btn-sm-primary" id="emptyBackToInput">回到输入页</button>',
         '</div>'
       ].join('');
       return;
     }
     const c = content;
+    const labels = getResumeLabels();
     const portfolioLinks = state.portfolioLinks.filter(Boolean);
     let projectLinkIdx = 0;
     const takeProjectLink = () => portfolioLinks[projectLinkIdx++] || '';
     const L = [];
-    L.push('<div class="resume-head' + (state.photoDataUrl ? ' has-photo' : '') + '">');
-    if (state.photoDataUrl) {
+    const showPhoto = state.currentLang !== 'en' && state.photoDataUrl;
+    L.push('<div class="resume-head' + (showPhoto ? ' has-photo' : '') + '">');
+    if (showPhoto) {
       L.push('<div class="resume-photo" contenteditable="false" aria-hidden="true"><img src="' + state.photoDataUrl + '" alt=""></div>');
     }
     L.push('<div class="resume-head-text"><h2>' + escHTML(c.name || state.sourceName || '') + '</h2>');
@@ -1261,7 +1281,7 @@
     L.push('</div></div>');
 
     if (c.education && c.education.length) {
-      L.push('<h3>教育经历</h3>');
+      L.push('<h3>' + labels.education + '</h3>');
       c.education.forEach(e => {
         L.push(renderResumeItem(
           '<strong>' + escHTML(e.school) + '</strong>' + (e.degree ? ' — ' + escHTML(e.degree) : ''),
@@ -1272,7 +1292,7 @@
       });
     }
     if (c.experiences && c.experiences.length) {
-      L.push('<h3>实习经历</h3>');
+      L.push('<h3>' + labels.experiences + '</h3>');
       c.experiences.forEach(exp => {
         L.push(renderResumeItem(
           '<strong>' + escHTML(exp.company) + '</strong>' + (exp.role ? ' — ' + escHTML(exp.role) : ''),
@@ -1282,7 +1302,7 @@
       });
     }
     if (c.projects && c.projects.length) {
-      L.push('<h3>项目经历</h3>');
+      L.push('<h3>' + labels.projects + '</h3>');
       c.projects.forEach(p => {
         L.push(renderResumeItem(
           renderLinkedTitle('<strong>' + escHTML(p.name) + '</strong>' + (p.role ? ' — ' + escHTML(p.role) : ''), takeProjectLink()),
@@ -1292,7 +1312,7 @@
       });
     }
     if (c.campus && c.campus.length) {
-      L.push('<h3>创业/校园经历</h3>');
+      L.push('<h3>' + labels.campus + '</h3>');
       c.campus.forEach(p => {
         L.push(renderResumeItem(
           renderLinkedTitle('<strong>' + escHTML(p.name) + '</strong>' + (p.role ? ' — ' + escHTML(p.role) : ''), takeProjectLink()),
@@ -1303,7 +1323,7 @@
     }
     const remainingLinks = portfolioLinks.slice(projectLinkIdx);
     if (remainingLinks.length) {
-      L.push('<h3>其他作品链接</h3>');
+      L.push('<h3>' + labels.links + '</h3>');
       L.push('<div class="resume-links-block">');
       remainingLinks.forEach(url => {
         L.push('<a class="resume-link-pill" href="' + escHTML(url) + '" target="_blank" rel="noopener noreferrer">' + escHTML(linkLabel(url)) + '</a>');
@@ -1314,7 +1334,7 @@
     if (showSupplementary && c.skills && c.skills.length) {
       const validSkills = c.skills.filter(s => s.category && (Array.isArray(s.items) ? s.items.length > 0 : s.items));
       if (validSkills.length > 0) {
-        L.push('<h3>技能</h3><div class="resume-skills">');
+        L.push('<h3>' + labels.skills + '</h3><div class="resume-skills">');
         validSkills.forEach(s => {
           const items = Array.isArray(s.items) ? s.items.join('、') : String(s.items || '');
           L.push('<p><strong>' + escHTML(s.category) + '：</strong>' + escHTML(items) + '</p>');
@@ -1323,7 +1343,7 @@
       }
     }
     if (showSupplementary && c.summary) {
-      L.push('<h3>个人概述</h3><p>' + escHTML(c.summary) + '</p>');
+      L.push('<h3>' + labels.summary + '</h3><p>' + escHTML(c.summary) + '</p>');
     }
     if (!L.some(part => /<h3>|<p>|<ul>/.test(part)) && content) {
       L.push('<p>' + escHTML(typeof content === 'string' ? content : JSON.stringify(content, null, 2)) + '</p>');
@@ -1408,13 +1428,76 @@
     if (!checkPageFill().needsFill) showToast('补充完成', 'success');
   }
 
+  async function ensureEnglishResume() {
+    if (state.resumeEN) return true;
+    if (!state.resumeZH) {
+      showToast('请先生成中文简历', 'warning');
+      return false;
+    }
+    showToast('正在生成英文纯文字版，约 20 秒…', 'info');
+    const result = await AIService.translateResume({
+      zhResume: state.resumeZH,
+      jd: state.effectiveJD || state.jd || state.jdTitle || ''
+    });
+    state.resumeEN = normalizeResume(result.en || result);
+    state.editorHTML.en = '';
+    persistResumeState();
+    return !!state.resumeEN;
+  }
+
+  function chooseDownloadLanguages() {
+    const currentDefault = state.currentLang === 'en' ? '2' : '1';
+    const choice = window.prompt('请选择导出语言：\n1 = 中文\n2 = English（纯文字，无照片）\n3 = 中文 + English 各一份', currentDefault);
+    if (choice === null) return [];
+    const normalized = String(choice).trim().toLowerCase();
+    if (['1', '中文', 'zh', 'chinese'].includes(normalized)) return ['zh'];
+    if (['2', '英文', 'english', 'en'].includes(normalized)) return ['en'];
+    if (['3', 'both', '双语', '中英', 'all'].includes(normalized)) return ['zh', 'en'];
+    showToast('没有识别导出选项，已取消', 'warning');
+    return [];
+  }
+
   // ── Download ──
   async function handleDownload() {
     saveCurrentEditorDraft();
-    const preview = document.getElementById('previewA4');
-    if (!preview || !preview.textContent.trim()) { showToast('请先生成简历', 'warning'); return; }
+    if (!hasResumeContent()) { showToast('请先生成简历', 'warning'); return; }
+    const langs = chooseDownloadLanguages();
+    if (!langs.length) return;
     const btns = [document.getElementById('downloadBtn'), document.getElementById('downloadBtn2')].filter(Boolean);
     btns.forEach(b => { b.textContent = '导出中…'; b.disabled = true; });
+    const originalLang = state.currentLang;
+    try {
+      for (const lang of langs) {
+        if (lang === 'en') {
+          const ready = await ensureEnglishResume();
+          if (!ready) continue;
+        }
+        await exportResumePDF(lang);
+      }
+      state.currentLang = originalLang;
+      $$('.et-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === originalLang));
+      renderEditor(); renderPreview(); checkPageFill();
+      showToast(langs.length > 1 ? '中英文 PDF 已下载' : 'PDF 下载完成', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('导出失败', 'error');
+    }
+    finally { btns.forEach(b => { b.textContent = '下载 PDF'; b.disabled = false; }); }
+  }
+
+  async function exportResumePDF(lang) {
+    const previousLang = state.currentLang;
+    if (state.currentLang !== lang) {
+      saveCurrentEditorDraft();
+      state.currentLang = lang;
+      $$('.et-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === lang));
+      renderEditor(); renderPreview(); checkPageFill();
+      await new Promise(r => setTimeout(r, 80));
+    }
+    const preview = document.getElementById('previewA4');
+    if (!preview || !preview.textContent.trim() || preview.querySelector('.resume-empty-state')) {
+      throw new Error('EMPTY_PREVIEW');
+    }
     try {
       await document.fonts?.ready;
       const rect = preview.getBoundingClientRect();
@@ -1434,19 +1517,19 @@
         const pageHeight = pdf.internal.pageSize.getHeight();
         pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight);
         addPdfLinks(pdf, preview, pageWidth, pageHeight);
-        pdf.save('resume.pdf');
+        pdf.save(lang === 'en' ? 'resume-en.pdf' : 'resume-zh.pdf');
       } else {
         const a = document.createElement('a');
         a.href = canvas.toDataURL('image/png');
-        a.download = 'resume.png';
+        a.download = lang === 'en' ? 'resume-en.png' : 'resume-zh.png';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         showToast('PDF 组件未加载，已降级导出 PNG', 'warning');
       }
-      showToast('下载完成', 'success');
-    } catch (err) { console.error(err); showToast('导出失败', 'error'); }
-    finally { btns.forEach(b => { b.textContent = '下载 PDF'; b.disabled = false; }); }
+    } finally {
+      state.currentLang = previousLang;
+    }
   }
 
   function addPdfLinks(pdf, preview, pageWidth, pageHeight) {
@@ -1719,7 +1802,18 @@
     else if (view === 'history') renderHistory();
   }
 
-  function switchLanguage(lang) {
+  async function switchLanguage(lang) {
+    if (lang === state.currentLang) return;
+    if (lang === 'en' && !state.resumeEN) {
+      try {
+        const ready = await ensureEnglishResume();
+        if (!ready) return;
+      } catch (err) {
+        console.error(err);
+        showToast('英文版生成失败，请稍后重试', 'error');
+        return;
+      }
+    }
     saveCurrentEditorDraft();
     state.currentLang = lang;
     $$('.et-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === lang));

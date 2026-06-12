@@ -554,6 +554,25 @@
       return result.raw || '';
     },
 
+    async translateResume({ zhResume, jd = '' }) {
+      const result = await callDeepSeek({
+        model: DEFAULT_MODEL,
+        systemPrompt: `You are a professional resume localization expert. Translate a Chinese resume JSON into a concise English resume JSON.
+
+Rules:
+1. Preserve facts strictly: do not invent companies, schools, dates, awards, numbers, links, skills, roles, or results.
+2. Keep the exact same JSON schema and section arrays.
+3. Translate company/school/project names only when they have obvious English names; otherwise keep the original proper noun.
+4. English bullets should be professional, concise, action-oriented, and STAR-based. Avoid AI-sounding filler.
+5. Do not add a photo field. English resume is pure text.
+6. Return JSON only, no markdown.`,
+        userMessage: `## Target role / JD context\n${jd}\n\n## Chinese resume JSON\n${JSON.stringify(zhResume, null, 2)}\n\nReturn only an English resume JSON object with the same schema.`,
+        temperature: 0.35,
+        maxTokens: 7000
+      });
+      return result;
+    },
+
     // ── Score Resume ──
     async scoreResume(zhContent, enContent, jd) {
       const result = await callDeepSeek({
