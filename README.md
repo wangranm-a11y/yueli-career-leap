@@ -8,7 +8,7 @@
 
 ## How It Works
 
-![跃历工作流](assets/readme-flow.svg)
+![跃历工作流](assets/readme-flow.png)
 
 1. 上传已有简历、经历素材和目标岗位 JD。
 2. AI 先拆解真实事实，保留学校、公司、岗位、时间、奖项和数据。

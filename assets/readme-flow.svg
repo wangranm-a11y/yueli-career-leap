@@ -19,7 +19,7 @@
     <rect width="250" height="180" fill="#f5f3ec" stroke="#bdb9ae" stroke-width="2"/>
     <text x="28" y="48" fill="#242426" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="900">02 Fact First</text>
     <text x="28" y="88" fill="#59554f" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800">Extract real facts</text>
-    <text x="28" y="116" fill="#59554f" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800">Keep dates & data</text>
+    <text x="28" y="116" fill="#59554f" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800">Keep dates &amp; data</text>
     <text x="28" y="144" fill="#59554f" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800">No fake awards</text>
   </g>
 
