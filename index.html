@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=38">
+  <link rel="stylesheet" href="styles.css?v=39">
 </head>
 <body>
 
@@ -237,6 +237,13 @@
 
   <!-- ── Editing View (Left editor + Right preview) ── -->
   <section class="view view-editing" id="viewEditing" style="display:none">
+    <div class="editing-progress" id="editingProgress" style="display:none">
+      <div class="editing-progress-card">
+        <strong>正在生成简历</strong>
+        <p id="editingProgressText">正在整理岗位和经历素材，可以先去喝口咖啡。</p>
+        <div class="editing-progress-track"><span id="editingProgressBar"></span></div>
+      </div>
+    </div>
     <div class="edit-toolbar">
       <button class="btn-sm" id="backToInputBtn">← 重新输入</button>
       <div class="et-lang-tabs">
@@ -318,8 +325,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="ai-service.js?v=38"></script>
-  <script src="resume-renderer.js?v=38"></script>
-  <script src="app.js?v=38"></script>
+  <script src="ai-service.js?v=39"></script>
+  <script src="resume-renderer.js?v=39"></script>
+  <script src="app.js?v=39"></script>
 </body>
 </html>

@@ -34,6 +34,7 @@
     generateProgressTimer: null,
     selectedRange: null,
     selectionMark: null,
+    draggedResumeItem: null,
   };
 
   const PAGE_FILL_TARGET = 98;
@@ -59,6 +60,24 @@
       return '<a class="resume-link" href="' + escHTML(text) + '" target="_blank" rel="noopener noreferrer">' + escHTML(text) + '</a>';
     }
     return escHTML(text);
+  }
+  function renderLinkedTitle(titleHTML, url) {
+    if (!url) return titleHTML;
+    return titleHTML + ' <a class="resume-title-link" href="' + escHTML(url) + '" target="_blank" rel="noopener noreferrer">' + escHTML(linkLabel(url)) + '</a>';
+  }
+  function renderResumeItem(titleHTML, duration, highlights, extraHTML) {
+    const L = [];
+    L.push('<section class="resume-item" draggable="true">');
+    L.push('<div class="resume-item-tools" contenteditable="false" aria-hidden="true"><span>拖动排序</span></div>');
+    L.push('<div class="resume-meta-row"><div>' + titleHTML + '</div><time>' + escHTML(duration || '') + '</time></div>');
+    if (extraHTML) L.push(extraHTML);
+    if (highlights && highlights.length) {
+      L.push('<ul>');
+      highlights.forEach(h => L.push('<li>' + formatBullet(h) + '</li>'));
+      L.push('</ul>');
+    }
+    L.push('</section>');
+    return L.join('\n');
   }
   function formatBullet(text) {
     if (!text) return '';
@@ -201,13 +220,26 @@
 
   function syncManualProfileFromInputs() {
     const link = (document.getElementById('profileLinkInput')?.value || '').trim();
-    state.portfolioLinks = parseLinks(document.getElementById('reqInput')?.value || '');
+    const requirementText = document.getElementById('reqInput')?.value || '';
+    const experienceText = document.getElementById('expInput')?.value || '';
+    state.portfolioLinks = parseLinks(requirementText + '\n' + experienceText);
     state.manualProfile = {
       name: (document.getElementById('profileNameInput')?.value || '').trim(),
       phone: (document.getElementById('profilePhoneInput')?.value || '').trim(),
       email: (document.getElementById('profileEmailInput')?.value || '').trim(),
-      links: [link, ...state.portfolioLinks].filter(Boolean)
+      links: [link].filter(Boolean)
     };
+  }
+
+  function linkLabel(url) {
+    try {
+      const u = new URL(url);
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts.length) return parts[parts.length - 1].replace(/[-_]+/g, ' ');
+      return u.hostname.replace(/^www\./, '');
+    } catch (e) {
+      return url;
+    }
   }
 
   function parseLinks(text) {
@@ -520,6 +552,7 @@
         sourceName: state.sourceName,
         sourceProfile: state.sourceProfile,
         manualProfile: state.manualProfile,
+        portfolioLinks: state.portfolioLinks,
         savedAt: new Date().toISOString()
       }));
     } catch (e) {
@@ -552,6 +585,7 @@
       state.sourceName = saved.sourceName || '';
       state.sourceProfile = saved.sourceProfile || state.sourceProfile;
       state.manualProfile = saved.manualProfile || state.manualProfile;
+      state.portfolioLinks = Array.isArray(saved.portfolioLinks) ? saved.portfolioLinks : [];
       return hasResumeContent();
     } catch (e) {
       console.warn('Restore resume state failed:', e);
@@ -675,6 +709,69 @@
     state.editorHTML[getLangKey()] = editor.innerHTML;
   }
 
+  function syncEditorAfterManualChange() {
+    saveCurrentEditorDraft();
+    renderPreview();
+    checkPageFill();
+    persistResumeState();
+  }
+
+  function handleEditorPaste(e) {
+    const editor = document.getElementById('editorArea');
+    if (!editor || !editor.contains(e.target)) return;
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData)?.getData('text/plain') || '';
+    const lines = text.split(/\n+/).map(x => x.trim()).filter(Boolean);
+    const html = lines.map(line => {
+      if (/^[-•*]\s+/.test(line)) return '<li>' + escHTML(line.replace(/^[-•*]\s+/, '')) + '</li>';
+      return '<p>' + escHTML(line) + '</p>';
+    }).join('');
+    document.execCommand('insertHTML', false, html || escHTML(text));
+    setTimeout(syncEditorAfterManualChange, 0);
+  }
+
+  function handleEditorDragStart(e) {
+    const item = e.target.closest?.('.resume-item');
+    if (!item) return;
+    if (!e.target.closest?.('.resume-item-tools')) {
+      e.preventDefault();
+      return;
+    }
+    state.draggedResumeItem = item;
+    item.classList.add('is-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', 'resume-item');
+  }
+
+  function handleEditorDragOver(e) {
+    const item = e.target.closest?.('.resume-item');
+    if (!item || !state.draggedResumeItem || item === state.draggedResumeItem) return;
+    e.preventDefault();
+    const rect = item.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    item.classList.toggle('drop-after', after);
+    item.classList.toggle('drop-before', !after);
+  }
+
+  function handleEditorDrop(e) {
+    const target = e.target.closest?.('.resume-item');
+    const dragged = state.draggedResumeItem;
+    if (!target || !dragged || target === dragged) return;
+    e.preventDefault();
+    const rect = target.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    target.classList.remove('drop-before', 'drop-after');
+    target.parentNode.insertBefore(dragged, after ? target.nextSibling : target);
+    dragged.classList.remove('is-dragging');
+    state.draggedResumeItem = null;
+    syncEditorAfterManualChange();
+  }
+
+  function handleEditorDragEnd() {
+    document.querySelectorAll('.resume-item').forEach(el => el.classList.remove('is-dragging', 'drop-before', 'drop-after'));
+    state.draggedResumeItem = null;
+  }
+
   // ── JD image upload ──
   async function handleJDImageSelect(e) {
     if (!e.target.files || !e.target.files.length) return;
@@ -793,6 +890,7 @@
     on('clearExp', 'click', () => {
       const e = document.getElementById('expInput'); if (e) e.value = '';
       state.experiences = ''; state.manualExperiences = ''; state.uploadedFiles = [];
+      syncManualProfileFromInputs();
       renderFileList(); updateCharCount();
     });
     document.querySelectorAll('input[name="jdMode"]').forEach(r => {
@@ -809,9 +907,13 @@
     on('expInput', 'input', () => {
       state.experiences = document.getElementById('expInput')?.value || '';
       state.manualExperiences = state.experiences;
+      syncManualProfileFromInputs();
       updateCharCount();
     });
-    on('reqInput', 'input', () => { state.requirements = document.getElementById('reqInput')?.value || ''; });
+    on('reqInput', 'input', () => {
+      state.requirements = document.getElementById('reqInput')?.value || '';
+      syncManualProfileFromInputs();
+    });
     ['profileNameInput', 'profilePhoneInput', 'profileEmailInput', 'profileLinkInput'].forEach(id => {
       on(id, 'input', syncManualProfileFromInputs);
     });
@@ -848,11 +950,16 @@
     const editorArea = document.getElementById('editorArea');
     if (editorArea) {
       editorArea.addEventListener('input', debounce(() => {
-        saveCurrentEditorDraft();
-        renderPreview();
-        checkPageFill();
-        persistResumeState();
+        syncEditorAfterManualChange();
       }, 400));
+      editorArea.addEventListener('paste', handleEditorPaste);
+      editorArea.addEventListener('dragstart', handleEditorDragStart);
+      editorArea.addEventListener('dragover', handleEditorDragOver);
+      editorArea.addEventListener('drop', handleEditorDrop);
+      editorArea.addEventListener('dragend', handleEditorDragEnd);
+      editorArea.addEventListener('dragleave', e => {
+        e.target.closest?.('.resume-item')?.classList.remove('drop-before', 'drop-after');
+      });
     }
 
     // Photo upload
@@ -937,8 +1044,6 @@
     const btn = document.getElementById('generateBtn');
     btn.disabled = true; btn.textContent = '⏳ 分析中…';
     if (state.resumeZH || state.resumeEN) saveSnapshot('生成前备份');
-    showResumeSkeleton('先把版面支起来，内容马上进场。');
-    switchView('edit');
     setGenerateProgress(12, '正在整理岗位和经历素材，预计 30-60 秒。可以去接杯水，但别跑太远。');
 
     try {
@@ -997,12 +1102,21 @@
     const progress = document.getElementById('generateProgress');
     const bar = document.getElementById('generateProgressBar');
     const status = document.getElementById('generateStatus');
-    if (!progress || !bar || !status) return;
+    const editingProgress = document.getElementById('editingProgress');
+    const editingBar = document.getElementById('editingProgressBar');
+    const editingText = document.getElementById('editingProgressText');
     const pct = Math.max(0, Math.min(100, percent || 0));
-    progress.style.display = pct > 0 ? 'block' : 'none';
-    bar.style.width = pct + '%';
-    if (isHTML) status.innerHTML = message || '';
-    else status.innerHTML = message ? '<span class="spinner"></span>' + escHTML(message) : '';
+    if (progress && bar && status) {
+      progress.style.display = pct > 0 ? 'block' : 'none';
+      bar.style.width = pct + '%';
+      if (isHTML) status.innerHTML = message || '';
+      else status.innerHTML = message ? '<span class="spinner"></span>' + escHTML(message) : '';
+    }
+    if (editingProgress && editingBar && editingText) {
+      editingProgress.style.display = pct > 0 ? 'flex' : 'none';
+      editingBar.style.width = pct + '%';
+      editingText.textContent = stripHTML(message || '') || '正在处理简历内容，可以先去喝口咖啡。';
+    }
     updateGenerationStage(isHTML ? stripHTML(message || '') : message);
   }
 
@@ -1085,6 +1199,9 @@
       return;
     }
     const c = content;
+    const portfolioLinks = state.portfolioLinks.filter(Boolean);
+    let projectLinkIdx = 0;
+    const takeProjectLink = () => portfolioLinks[projectLinkIdx++] || '';
     const L = [];
     L.push('<div class="resume-head' + (state.photoDataUrl ? ' has-photo' : '') + '">');
     if (state.photoDataUrl) {
@@ -1098,42 +1215,52 @@
     if (c.education && c.education.length) {
       L.push('<h3>教育经历</h3>');
       c.education.forEach(e => {
-        L.push('<div class="resume-meta-row"><div><strong>' + escHTML(e.school) + '</strong>' + (e.degree ? ' — ' + escHTML(e.degree) : '') + '</div><time>' + escHTML(e.duration || '') + '</time></div>');
-        if (e.notes) L.push('<p class="resume-edu-notes">' + escHTML(e.notes) + '</p>');
+        L.push(renderResumeItem(
+          '<strong>' + escHTML(e.school) + '</strong>' + (e.degree ? ' — ' + escHTML(e.degree) : ''),
+          e.duration || '',
+          [],
+          e.notes ? '<p class="resume-edu-notes">' + escHTML(e.notes) + '</p>' : ''
+        ));
       });
     }
     if (c.experiences && c.experiences.length) {
       L.push('<h3>实习经历</h3>');
       c.experiences.forEach(exp => {
-        L.push('<div class="resume-meta-row"><div><strong>' + escHTML(exp.company) + '</strong>' + (exp.role ? ' — ' + escHTML(exp.role) : '') + '</div><time>' + escHTML(exp.duration || '') + '</time></div>');
-        if (exp.highlights && exp.highlights.length) {
-          L.push('<ul>');
-          exp.highlights.forEach(h => L.push('<li>' + formatBullet(h) + '</li>'));
-          L.push('</ul>');
-        }
+        L.push(renderResumeItem(
+          '<strong>' + escHTML(exp.company) + '</strong>' + (exp.role ? ' — ' + escHTML(exp.role) : ''),
+          exp.duration || '',
+          exp.highlights || []
+        ));
       });
     }
     if (c.projects && c.projects.length) {
       L.push('<h3>项目经历</h3>');
       c.projects.forEach(p => {
-        L.push('<div class="resume-meta-row"><div><strong>' + escHTML(p.name) + '</strong>' + (p.role ? ' — ' + escHTML(p.role) : '') + '</div><time>' + escHTML(p.duration || '') + '</time></div>');
-        if (p.highlights && p.highlights.length) {
-          L.push('<ul>');
-          p.highlights.forEach(h => L.push('<li>' + formatBullet(h) + '</li>'));
-          L.push('</ul>');
-        }
+        L.push(renderResumeItem(
+          renderLinkedTitle('<strong>' + escHTML(p.name) + '</strong>' + (p.role ? ' — ' + escHTML(p.role) : ''), takeProjectLink()),
+          p.duration || '',
+          p.highlights || []
+        ));
       });
     }
     if (c.campus && c.campus.length) {
       L.push('<h3>创业/校园经历</h3>');
       c.campus.forEach(p => {
-        L.push('<div class="resume-meta-row"><div><strong>' + escHTML(p.name) + '</strong>' + (p.role ? ' — ' + escHTML(p.role) : '') + '</div><time>' + escHTML(p.duration || '') + '</time></div>');
-        if (p.highlights && p.highlights.length) {
-          L.push('<ul>');
-          p.highlights.forEach(h => L.push('<li>' + formatBullet(h) + '</li>'));
-          L.push('</ul>');
-        }
+        L.push(renderResumeItem(
+          renderLinkedTitle('<strong>' + escHTML(p.name) + '</strong>' + (p.role ? ' — ' + escHTML(p.role) : ''), takeProjectLink()),
+          p.duration || '',
+          p.highlights || []
+        ));
       });
+    }
+    const remainingLinks = portfolioLinks.slice(projectLinkIdx);
+    if (remainingLinks.length) {
+      L.push('<h3>其他作品链接</h3>');
+      L.push('<div class="resume-links-block">');
+      remainingLinks.forEach(url => {
+        L.push('<a class="resume-link-pill" href="' + escHTML(url) + '" target="_blank" rel="noopener noreferrer">' + escHTML(linkLabel(url)) + '</a>');
+      });
+      L.push('</div>');
     }
     const showSupplementary = shouldShowSupplementary(c);
     if (showSupplementary && c.skills && c.skills.length) {

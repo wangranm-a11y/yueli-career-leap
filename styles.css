@@ -722,6 +722,44 @@ textarea, input { font-family: inherit; }
 .editor-area small { color: #888; font-size: 12px; }
 .editor-area strong { font-weight: 700; }
 .editor-area p { line-height: 1.6; margin: 1px 0; }
+.resume-item {
+  position: relative;
+  margin: 5px 0 8px;
+  padding: 4px 6px 3px;
+  border: 1px solid transparent;
+}
+.resume-item:hover {
+  border-color: rgba(36,36,38,.18);
+  background: rgba(245,243,236,.55);
+}
+.resume-item.is-dragging {
+  opacity: .45;
+}
+.resume-item.drop-before {
+  border-top: 2px solid var(--text);
+}
+.resume-item.drop-after {
+  border-bottom: 2px solid var(--text);
+}
+.resume-item-tools {
+  display: none;
+  position: absolute;
+  right: 4px;
+  top: -18px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 2px 5px;
+  cursor: grab;
+  pointer-events: auto;
+  user-select: none;
+}
+.resume-item-tools:active { cursor: grabbing; }
+.resume-item:hover .resume-item-tools {
+  display: block;
+}
 .resume-head {
   position: relative;
   min-height: 30px;
@@ -869,6 +907,52 @@ textarea, input { font-family: inherit; }
   color: #1b5ca8;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+.resume-title-link {
+  display: inline-flex;
+  align-items: center;
+  max-width: 180px;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border: 1px solid #d3d0c7;
+  color: #4d665e;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-decoration: none;
+  vertical-align: 1px;
+  background: #f4f8f3;
+}
+.resume-title-link:hover {
+  border-color: #4d665e;
+}
+.resume-links-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+.resume-link-pill {
+  display: inline-flex;
+  max-width: 100%;
+  border: 1px solid #d3d0c7;
+  padding: 3px 7px;
+  color: #242426;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  background: #f3f1ea;
+}
+.resume-link-pill:hover {
+  border-color: #242426;
+}
+.preview-a4-page .resume-item {
+  border-color: transparent !important;
+  background: transparent !important;
+  padding: 0;
+}
+.preview-a4-page .resume-item-tools {
+  display: none !important;
 }
 .preview-a4-page.theme-modern h2 { letter-spacing: 2px; font-weight: 600; }
 .preview-a4-page.theme-modern h3 { border-bottom-color: #777; letter-spacing: 2px; font-weight: 600; }
@@ -2483,4 +2567,50 @@ body {
 }
 #startForm {
   margin-top: 26px !important;
+}
+
+/* v39: visible generation progress inside editor view */
+.editing-progress {
+  position: fixed;
+  inset: 56px 0 0;
+  z-index: 40;
+  align-items: center;
+  justify-content: center;
+  background: rgba(238,236,229,.78);
+  backdrop-filter: blur(3px);
+}
+.editing-progress-card {
+  width: min(520px, calc(100% - 48px));
+  border: 1px solid var(--border);
+  background: #f5f3ec;
+  padding: 24px;
+  box-shadow: 0 18px 50px rgba(36,36,38,.12);
+}
+.editing-progress-card strong {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+.editing-progress-card p {
+  margin: 0 0 18px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.7;
+}
+.editing-progress-track {
+  height: 8px;
+  border: 1px solid var(--border);
+  background: #dedbd2;
+  overflow: hidden;
+}
+.editing-progress-track span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--text);
+  transition: width .35s ease;
 }
