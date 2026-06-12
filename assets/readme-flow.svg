@@ -1,0 +1,40 @@
+<svg width="1200" height="520" viewBox="0 0 1200 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="520" fill="#eeece5"/>
+  <path d="M0 120H1200M0 240H1200M0 360H1200M120 0V520M240 0V520M360 0V520M480 0V520M600 0V520M720 0V520M840 0V520M960 0V520M1080 0V520" stroke="#242426" stroke-opacity=".055"/>
+  <text x="64" y="82" fill="#242426" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="900">Career Leap Workflow</text>
+  <text x="64" y="118" fill="#66625a" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Fact-first resume generation from scattered experience to one-page A4 resume</text>
+
+  <g transform="translate(64 180)">
+    <rect width="230" height="180" fill="#242426"/>
+    <text x="28" y="48" fill="#eeece5" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="900">01 Input</text>
+    <text x="28" y="88" fill="#d7d4cb" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Resume files</text>
+    <text x="28" y="116" fill="#d7d4cb" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Experience notes</text>
+    <text x="28" y="144" fill="#d7d4cb" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Target JD</text>
+  </g>
+
+  <path d="M330 270H410" stroke="#242426" stroke-width="3"/>
+  <path d="M410 270L392 258V282L410 270Z" fill="#242426"/>
+
+  <g transform="translate(438 180)">
+    <rect width="250" height="180" fill="#f5f3ec" stroke="#bdb9ae" stroke-width="2"/>
+    <text x="28" y="48" fill="#242426" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="900">02 Fact First</text>
+    <text x="28" y="88" fill="#59554f" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800">Extract real facts</text>
+    <text x="28" y="116" fill="#59554f" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800">Keep dates & data</text>
+    <text x="28" y="144" fill="#59554f" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800">No fake awards</text>
+  </g>
+
+  <path d="M724 270H804" stroke="#242426" stroke-width="3"/>
+  <path d="M804 270L786 258V282L804 270Z" fill="#242426"/>
+
+  <g transform="translate(832 180)">
+    <rect width="304" height="180" fill="#f5f3ec" stroke="#bdb9ae" stroke-width="2"/>
+    <text x="28" y="48" fill="#242426" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="900">03 One Page A4</text>
+    <line x1="28" y1="72" x2="276" y2="72" stroke="#242426" stroke-width="3"/>
+    <text x="28" y="108" fill="#59554f" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800">JD-matched bullets</text>
+    <text x="28" y="136" fill="#59554f" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800">STAR structure</text>
+    <text x="28" y="164" fill="#59554f" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800">Editable resume preview</text>
+  </g>
+
+  <text x="64" y="438" fill="#242426" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="900">跃历</text>
+  <text x="126" y="438" fill="#66625a" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800">From scattered experience to a high-match resume.</text>
+</svg>
