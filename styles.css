@@ -869,7 +869,9 @@ textarea, input { font-family: inherit; }
 }
 .preview-a4-page {
   width: var(--a4-width);
+  height: var(--a4-height);
   min-height: var(--a4-height);
+  overflow: hidden;
   background: #fff;
   box-shadow: 0 4px 24px rgba(0,0,0,0.15);
   padding: 34px 52px 38px;
@@ -1296,6 +1298,35 @@ textarea, input { font-family: inherit; }
   width: 320px;
 }
 
+.selection-toolbar {
+  position: fixed;
+  z-index: 270;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid rgba(14,18,14,0.18);
+  background: #171717;
+  box-shadow: 0 14px 32px rgba(0,0,0,0.24);
+}
+.selection-toolbar button {
+  min-width: 34px;
+  height: 30px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: transparent;
+  color: #f7f8f4;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.selection-toolbar button:hover {
+  background: #f7f8f4;
+  color: #171717;
+}
+.selection-toolbar #selectionRewriteBtn {
+  min-width: 70px;
+  padding: 0 10px;
+}
+
 .ai-followup-panel {
   margin: 28px auto 40px;
   padding: 18px;
@@ -1394,6 +1425,15 @@ textarea, input { font-family: inherit; }
   margin-bottom: 8px;
 }
 .rewrite-input:focus { border-color: var(--accent); }
+.rewrite-notice {
+  margin: -2px 0 8px;
+  padding: 8px 9px;
+  border: 1px solid #d8c7a3;
+  background: #fff8e6;
+  color: #5e4a1e;
+  font-size: 12px;
+  line-height: 1.45;
+}
 .rewrite-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .rewrite-progress {
   height: 3px;

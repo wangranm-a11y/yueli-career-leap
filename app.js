@@ -86,6 +86,19 @@
     if (m) return `<strong>${m[1]}${m[2]}</strong> ${m[3]}`;
     return safe;
   }
+  function cleanRewriteText(text) {
+    return String(text || '')
+      .replace(/^["“”']+|["“”']+$/g, '')
+      .replace(/^\s*[-•*]\s+/gm, '')
+      .trim();
+  }
+  function isNeedMoreFacts(text) {
+    return /^NEED_MORE_FACTS\s*[:：]/i.test(String(text || '').trim());
+  }
+  function getNeedMoreFactsMessage(text) {
+    const msg = String(text || '').replace(/^NEED_MORE_FACTS\s*[:：]\s*/i, '').trim();
+    return msg || '这条修改需要更多事实。请补充具体经历、时间、数据或产出后再改写，我会先保留原文。';
+  }
   function debounce(fn, delay) {
     let timer;
     return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn.apply(this, args), delay); };
@@ -902,6 +915,23 @@
     on('rewriteCancel', 'click', closeRewritePopover);
     on('rewriteInput', 'keydown', e => { if (e.key === 'Enter') handleRewrite(); if (e.key === 'Escape') closeRewritePopover(); });
     on('boldBtn', 'click', handleBoldSelection);
+    on('selectionBoldBtn', 'click', e => {
+      e.preventDefault();
+      restoreTrackedSelection();
+      handleBoldSelection();
+      hideSelectionToolbar();
+    });
+    on('selectionRewriteBtn', 'click', e => {
+      e.preventDefault();
+      restoreTrackedSelection();
+      const sel = window.getSelection();
+      const editor = document.getElementById('editorArea');
+      if (sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed && editor && editor.contains(sel.anchorNode)) {
+        state.selectedRange = sel.getRangeAt(0).cloneRange();
+        openRewritePopover(state.selectedRange);
+        hideSelectionToolbar();
+      }
+    });
     on('clearJD', 'click', () => {
       const a = document.getElementById('jdTitleInput'); if (a) a.value = '';
       const b = document.getElementById('jdInput'); if (b) b.value = '';
@@ -952,22 +982,27 @@
     on('followupGo', 'click', handleFollowupRefine);
     setupFollowupReveal();
 
-    // Editor mouseup → track selection
-    document.addEventListener('mouseup', () => {
+    // Editor mouseup → track selection and show a compact editing toolbar.
+    document.addEventListener('mouseup', (event) => {
+      if (event.target?.closest?.('#selectionToolbar, #rewritePopover')) return;
       setTimeout(() => {
         const sel = window.getSelection();
         const ed = document.getElementById('editorArea');
-        const popover = document.getElementById('rewritePopover');
         if (sel.rangeCount > 0 && ed && ed.contains(sel.anchorNode)) {
           const range = sel.getRangeAt(0);
           if (!range.collapsed) {
             state.selectedRange = range.cloneRange();
-            if (state.currentView === 'edit' && popover && popover.style.display === 'none') {
-              openRewritePopover(state.selectedRange);
-            }
+            if (state.currentView === 'edit') showSelectionToolbar(range);
+            return;
           }
         }
+        hideSelectionToolbar();
       }, 40);
+    });
+
+    document.addEventListener('mousedown', e => {
+      if (e.target?.closest?.('#selectionToolbar, #rewritePopover, #editorArea')) return;
+      hideSelectionToolbar();
     });
 
     // Editor input → live preview sync
@@ -1501,14 +1536,25 @@
     try {
       await document.fonts?.ready;
       const rect = preview.getBoundingClientRect();
+      const pageCssWidth = Math.ceil(rect.width || ResumeRenderer.A4_WIDTH);
+      const pageCssHeight = Math.ceil(pageCssWidth * (ResumeRenderer.A4_HEIGHT / ResumeRenderer.A4_WIDTH));
       const canvas = await html2canvas(preview, {
-        width: Math.ceil(rect.width),
-        height: Math.ceil(rect.height),
+        width: pageCssWidth,
+        height: pageCssHeight,
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
         windowWidth: document.documentElement.clientWidth,
-        windowHeight: document.documentElement.clientHeight
+        windowHeight: document.documentElement.clientHeight,
+        onclone: (doc) => {
+          const cloned = doc.getElementById('previewA4');
+          if (cloned) {
+            cloned.style.width = pageCssWidth + 'px';
+            cloned.style.height = pageCssHeight + 'px';
+            cloned.style.minHeight = pageCssHeight + 'px';
+            cloned.style.overflow = 'hidden';
+          }
+        }
       });
       const jsPDF = window.jspdf?.jsPDF;
       if (jsPDF) {
@@ -1535,14 +1581,16 @@
   function addPdfLinks(pdf, preview, pageWidth, pageHeight) {
     const pageRect = preview.getBoundingClientRect();
     if (!pageRect.width || !pageRect.height || !pdf.link) return;
+    const pageCssHeight = pageRect.width * (pageHeight / pageWidth);
     preview.querySelectorAll('a[href]').forEach(a => {
       const href = a.getAttribute('href');
       if (!href) return;
       const r = a.getBoundingClientRect();
+      if (r.top < pageRect.top || r.bottom > pageRect.top + pageCssHeight) return;
       const x = (r.left - pageRect.left) / pageRect.width * pageWidth;
-      const y = (r.top - pageRect.top) / pageRect.height * pageHeight;
+      const y = (r.top - pageRect.top) / pageCssHeight * pageHeight;
       const w = r.width / pageRect.width * pageWidth;
-      const h = r.height / pageRect.height * pageHeight;
+      const h = r.height / pageCssHeight * pageHeight;
       if (w > 0 && h > 0) pdf.link(x, y, w, h, { url: href });
     });
   }
@@ -1559,8 +1607,40 @@
     syncEditorAfterManualChange();
   }
 
+  function restoreTrackedSelection() {
+    const editor = document.getElementById('editorArea');
+    if (!editor || !state.selectedRange) return false;
+    if (!editor.contains(state.selectedRange.commonAncestorContainer)) return false;
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(state.selectedRange.cloneRange());
+    return true;
+  }
+
+  function showSelectionToolbar(range) {
+    const toolbar = document.getElementById('selectionToolbar');
+    if (!toolbar || !range) return;
+    const rect = range.getBoundingClientRect();
+    if (!rect.width && !rect.height) return;
+    const width = toolbar.offsetWidth || 132;
+    const top = Math.max(72, rect.top + window.scrollY - 42);
+    const left = Math.min(
+      Math.max(12, rect.left + window.scrollX + rect.width / 2 - width / 2),
+      window.scrollX + window.innerWidth - width - 12
+    );
+    toolbar.style.top = top + 'px';
+    toolbar.style.left = left + 'px';
+    toolbar.style.display = 'flex';
+  }
+
+  function hideSelectionToolbar() {
+    const toolbar = document.getElementById('selectionToolbar');
+    if (toolbar) toolbar.style.display = 'none';
+  }
+
   // ── Rewrite ──
   function openRewritePopover(range) {
+    hideSelectionToolbar();
     markSelectedRange(range);
     const p = document.getElementById('rewritePopover');
     const rect = (state.selectionMark || range).getBoundingClientRect();
@@ -1568,6 +1648,11 @@
     p.style.left = Math.min(rect.left + window.scrollX, window.innerWidth - 340) + 'px';
     p.style.display = 'block';
     document.getElementById('rewriteInput').value = '';
+    const notice = document.getElementById('rewriteNotice');
+    if (notice) {
+      notice.style.display = 'none';
+      notice.textContent = '';
+    }
     setTimeout(() => document.getElementById('rewriteInput').focus(), 100);
   }
   function clearSelectionMark(keepText) {
@@ -1594,8 +1679,6 @@
     } catch (e) {
       state.selectedRange = range.cloneRange();
     }
-    saveCurrentEditorDraft();
-    renderPreview();
   }
   function closeRewritePopover() {
     document.getElementById('rewritePopover').style.display = 'none';
@@ -1619,6 +1702,70 @@
     go.textContent = isBusy ? '改写中' : '改写';
   }
 
+  function showRewriteNotice(message) {
+    const notice = document.getElementById('rewriteNotice');
+    if (!notice) {
+      showToast(message, 'warning');
+      return;
+    }
+    notice.textContent = message;
+    notice.style.display = 'block';
+  }
+
+  function closestElementFromNode(node) {
+    if (!node) return null;
+    return node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  }
+
+  function replaceWithFormattedRewrite(target, range, rewritten) {
+    const text = cleanRewriteText(rewritten);
+    const lines = text.split(/\n+/).map(x => x.trim()).filter(Boolean);
+    if (!lines.length) return false;
+
+    const anchor = target || closestElementFromNode(range?.commonAncestorContainer);
+    const item = anchor?.closest?.('li');
+    if (item) {
+      item.innerHTML = formatBullet(lines[0]);
+      let current = item;
+      for (let i = 1; i < lines.length; i++) {
+        const next = document.createElement('li');
+        next.innerHTML = formatBullet(lines[i]);
+        current.after(next);
+        current = next;
+      }
+      return true;
+    }
+
+    const section = anchor?.closest?.('.resume-item');
+    if (section && lines.length > 1) {
+      let list = section.querySelector('ul');
+      if (!list) {
+        list = document.createElement('ul');
+        section.appendChild(list);
+      }
+      list.innerHTML = lines.map(line => '<li>' + formatBullet(line) + '</li>').join('');
+      return true;
+    }
+
+    const frag = document.createDocumentFragment();
+    lines.forEach((line, idx) => {
+      const el = document.createElement(lines.length === 1 ? 'span' : 'p');
+      el.innerHTML = formatBullet(line);
+      frag.appendChild(el);
+      if (lines.length === 1 && idx === 0) frag.appendChild(document.createTextNode(''));
+    });
+    if (target && target.parentNode) {
+      target.parentNode.replaceChild(frag, target);
+      return true;
+    }
+    if (range) {
+      range.deleteContents();
+      range.insertNode(frag);
+      return true;
+    }
+    return false;
+  }
+
   async function handleRewrite() {
     const instruction = document.getElementById('rewriteInput').value.trim();
     const mark = state.selectionMark;
@@ -1630,22 +1777,26 @@
     setRewriteBusy(true);
     showToast('AI 改写中…', 'info');
     try {
-      saveSnapshot('改写前');
       const rewritten = await AIService.rewriteSection({ selectedText, instruction, fullContext });
       if (rewritten) {
-        if (mark && mark.parentNode) {
-          mark.parentNode.replaceChild(document.createTextNode(rewritten), mark);
-          state.selectionMark = null;
-        } else if (range) {
-          range.deleteContents();
-          range.insertNode(document.createTextNode(rewritten));
+        if (isNeedMoreFacts(rewritten)) {
+          showRewriteNotice(getNeedMoreFactsMessage(rewritten));
+          showToast('需要补充事实，原文已保留', 'warning');
+          return;
         }
-        saveCurrentEditorDraft();
-        renderPreview(); checkPageFill();
-        persistResumeState();
-        state.selectedRange = null;
-        document.getElementById('rewritePopover').style.display = 'none';
-        showToast('改写完成', 'success');
+        saveSnapshot('改写前');
+        const replaced = replaceWithFormattedRewrite(mark, range, rewritten);
+        if (replaced) {
+          state.selectionMark = null;
+          saveCurrentEditorDraft();
+          renderPreview(); checkPageFill();
+          persistResumeState();
+          state.selectedRange = null;
+          document.getElementById('rewritePopover').style.display = 'none';
+          showToast('改写完成，已按原结构排版', 'success');
+        } else {
+          showRewriteNotice('没有找到可替换的位置，原文已保留。请重新选中一整条 bullet 或标题再试。');
+        }
       } else {
         showToast('AI 没有返回改写内容，请换个指令再试', 'warning');
       }
@@ -1744,12 +1895,11 @@
 
   function restoreVersion(idx) {
     const v = state.versions[idx]; if (!v) return;
-    saveSnapshot('恢复前备份');
     state.resumeZH = v.zh ? JSON.parse(JSON.stringify(v.zh)) : null;
     state.resumeEN = v.en ? JSON.parse(JSON.stringify(v.en)) : null;
     state.editorHTML = v.editorHTML ? JSON.parse(JSON.stringify(v.editorHTML)) : { zh: '', en: '' };
     state.effectiveJD = v.effectiveJD || state.effectiveJD;
-    saveSnapshot('恢复: ' + v.label);
+    state.currentVersionIdx = idx;
     persistResumeState();
     renderEditor(); renderPreview(); checkPageFill(); renderHistory();
     showToast('已恢复', 'success');
