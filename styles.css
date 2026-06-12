@@ -2444,3 +2444,32 @@ body {
 .input-grid--identity {
   margin-top: 18px;
 }
+
+/* v35: safe empty state for result views */
+.resume-empty-state {
+  max-width: 360px;
+  margin: 72px auto 0;
+  padding: 22px;
+  border: 1px solid var(--border);
+  background: #f3f1ea;
+  color: var(--text);
+  text-align: left;
+}
+.resume-empty-state strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+.resume-empty-state p {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.75;
+}
+.resume-empty-state--preview {
+  margin-top: 260px;
+  text-align: center;
+}

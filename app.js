@@ -484,6 +484,15 @@
   function loadState() { state.apiKey = AIService.getApiKey(); }
   function savePrefs() { localStorage.setItem('cs_prefs', JSON.stringify({ theme: state.theme })); }
 
+  function hasResumeContent() {
+    return !!(
+      state.resumeZH ||
+      state.resumeEN ||
+      state.editorHTML.zh ||
+      state.editorHTML.en
+    );
+  }
+
   // ── File handlers (MUST run first, independent of everything) ──
   function setupFileHandlers() {
     const dropZone = document.getElementById('fileDropZone');
@@ -672,6 +681,9 @@
     on('downloadBtn', 'click', handleDownload);
     on('downloadBtn2', 'click', handleDownload);
     on('viewTabs', 'click', e => { if (e.target.classList.contains('tb-tab')) switchView(e.target.dataset.view); });
+    document.addEventListener('click', e => {
+      if (e.target && e.target.id === 'emptyBackToInput') switchView('input');
+    });
     const langTabs = document.querySelector('.et-lang-tabs');
     if (langTabs) langTabs.addEventListener('click', e => { if (e.target.classList.contains('et-tab')) switchLanguage(e.target.dataset.lang); });
     on('backToInputBtn', 'click', () => switchView('input'));
@@ -880,6 +892,14 @@
       else if (err.message === 'API_KEY_INVALID') { msg = 'Key 无效'; openAPIKeyModal(); }
       setGenerateProgress(0, '<span style="color:#c7512e;">' + escHTML(msg) + '</span>', true);
       showToast(msg, 'error');
+      if (hasResumeContent()) {
+        switchView('edit');
+        renderEditor();
+        renderPreview();
+      } else {
+        clearEditorDrafts();
+        switchView('input');
+      }
     } finally {
       state.isGenerating = false;
       btn.disabled = false; btn.textContent = '🚀 生成简历';
@@ -967,7 +987,16 @@
       content = state.resumeZH;
       showToast('英文版暂未生成，先显示中文版内容', 'info');
     }
-    if (!content) { el.innerHTML = '<p style="color:#9b8d78;">暂无内容，请回到输入页重新生成。</p>'; return; }
+    if (!content) {
+      el.innerHTML = [
+        '<div class="resume-empty-state">',
+        '<strong>还没有生成简历</strong>',
+        '<p>先回到输入页填写目标岗位和经历素材，生成成功后这里会显示可编辑内容。</p>',
+        '<button type="button" class="btn-sm btn-sm-primary" id="emptyBackToInput">回到输入页</button>',
+        '</div>'
+      ].join('');
+      return;
+    }
     const c = content;
     const L = [];
     L.push('<div class="resume-head' + (state.photoDataUrl ? ' has-photo' : '') + '">');
@@ -1052,8 +1081,8 @@
     if (!previewEl) return;
     previewEl.classList.remove('theme-professional', 'theme-modern', 'theme-creative');
     previewEl.classList.add('theme-' + (state.theme || 'professional'));
-    if (!editorEl || !editorEl.innerHTML.trim()) {
-      previewEl.innerHTML = '<p style="color:#9b8d78;text-align:center;padding-top:300px;">暂无简历</p>';
+    if (!editorEl || !editorEl.innerHTML.trim() || editorEl.querySelector('.resume-empty-state')) {
+      previewEl.innerHTML = '<div class="resume-empty-state resume-empty-state--preview"><strong>等待生成</strong><p>生成完成后会在这里预览一页 A4 简历。</p></div>';
       return;
     }
     previewEl.innerHTML = editorEl.innerHTML;
@@ -1373,6 +1402,10 @@
 
   // ── View switching ──
   function switchView(view) {
+    if (['edit', 'score', 'history'].includes(view) && !state.isGenerating && !hasResumeContent()) {
+      view = 'input';
+      showToast('请先生成简历', 'info');
+    }
     state.currentView = view;
     $$('.tb-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
     document.getElementById('viewInput').style.display = view === 'input' ? '' : 'none';
