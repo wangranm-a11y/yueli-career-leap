@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=39">
+  <link rel="stylesheet" href="styles.css?v=40">
 </head>
 <body>
 
@@ -256,6 +256,7 @@
         <option value="creative">创意暖色</option>
       </select>
       <span class="et-spacer"></span>
+      <button class="btn-sm" id="boldBtn" title="加粗选中文字">B 加粗</button>
       <button class="btn-sm" id="rewriteSelectedBtn">改写选中</button>
       <button class="btn-sm" id="refineBtn">JD 精修</button>
       <button class="btn-sm btn-sm-primary" id="downloadBtn2">下载 PDF</button>
@@ -263,7 +264,7 @@
     <div class="edit-split">
       <!-- Left: Editor -->
       <div class="edit-left">
-        <div class="edit-left-label">编辑区 - 可直接修改文字；选中文字后会弹出 AI 改写输入框</div>
+        <div class="edit-left-label edit-left-label--active">编辑区：可直接改字、粘贴内容、加粗文字；拖动每段左侧手柄可调整经历顺序</div>
         <div class="edit-left-content-wrapper">
           <div id="editorArea" class="editor-area" contenteditable="true"></div>
           <div id="fillPrompt" class="fill-prompt" style="display:none">
@@ -325,8 +326,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="ai-service.js?v=39"></script>
-  <script src="resume-renderer.js?v=39"></script>
-  <script src="app.js?v=39"></script>
+  <script src="ai-service.js?v=40"></script>
+  <script src="resume-renderer.js?v=40"></script>
+  <script src="app.js?v=40"></script>
 </body>
 </html>

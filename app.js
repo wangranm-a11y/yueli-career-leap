@@ -68,7 +68,7 @@
   function renderResumeItem(titleHTML, duration, highlights, extraHTML) {
     const L = [];
     L.push('<section class="resume-item" draggable="true">');
-    L.push('<div class="resume-item-tools" contenteditable="false" aria-hidden="true"><span>拖动排序</span></div>');
+    L.push('<div class="resume-item-tools" contenteditable="false" draggable="true" title="拖动整段经历排序"><span>拖动</span></div>');
     L.push('<div class="resume-meta-row"><div>' + titleHTML + '</div><time>' + escHTML(duration || '') + '</time></div>');
     if (extraHTML) L.push(extraHTML);
     if (highlights && highlights.length) {
@@ -879,6 +879,7 @@
     on('rewriteGo', 'click', handleRewrite);
     on('rewriteCancel', 'click', closeRewritePopover);
     on('rewriteInput', 'keydown', e => { if (e.key === 'Enter') handleRewrite(); if (e.key === 'Escape') closeRewritePopover(); });
+    on('boldBtn', 'click', handleBoldSelection);
     on('clearJD', 'click', () => {
       const a = document.getElementById('jdTitleInput'); if (a) a.value = '';
       const b = document.getElementById('jdInput'); if (b) b.value = '';
@@ -1066,10 +1067,12 @@
       switchView('edit');
       renderEditor(); renderPreview();
       setGenerateProgress(88, '正在把内容自动铺满 A4，一杯咖啡的最后几口。');
+      startAutoFillProgressLoop();
       const fill = checkPageFill();
       if (fill.needsFill) {
         await autoFillToFit(4, { silent: true });
       }
+      stopGenerateProgressLoop();
       saveSnapshot(state.jdTitle ? '岗位: ' + state.jdTitle : '初始生成');
       persistResumeState();
       setGenerateProgress(100, '生成完成，已默认整理成一页 A4。');
@@ -1121,8 +1124,6 @@
   }
 
   function startGenerateProgressLoop() {
-    stopGenerateProgressLoop();
-    const startedAt = Date.now();
     const copy = [
       '正在拆经历事实：AI 现在像 HR 一样挑重点，稍微有点挑剔。',
       '正在把不相关经历翻译成可迁移能力，不浪费你任何一段努力。',
@@ -1130,12 +1131,34 @@
       '正在压实 A4 版面，让它看起来不是“刚毕业的空白感”。',
       '最后检查时间、排序和一页密度，咖啡可以喝到第三口了。'
     ];
+    startProgressDrip({ startPct: 18, maxPct: 76, messages: copy, tickMs: 850, messageMs: 12000 });
+  }
+
+  function startAutoFillProgressLoop() {
+    const copy = [
+      '正在把内容压进一页 A4：先别急，它在和版面较劲。',
+      '这一段稍微久一点：正在检查每条经历是不是接近两行、又不显得啰嗦。',
+      '还在微调密度：让实习和项目更饱满，尽量少用技能/概述凑数。',
+      '正在做最后版面巡检：照片、标题、日期和 bullet 都要站好队。',
+      '快好了：现在是在确认预览和导出的 PDF 尽量长得一模一样。'
+    ];
+    startProgressDrip({ startPct: 88, maxPct: 96, messages: copy, tickMs: 900, messageMs: 7000 });
+  }
+
+  function startProgressDrip(options) {
+    stopGenerateProgressLoop();
+    const startedAt = Date.now();
+    const startPct = options.startPct || 10;
+    const maxPct = options.maxPct || 90;
+    const messages = options.messages || [];
+    const tickMs = options.tickMs || 1000;
+    const messageMs = options.messageMs || 10000;
     state.generateProgressTimer = setInterval(() => {
       const elapsed = Date.now() - startedAt;
-      const pct = Math.min(76, 18 + Math.floor(elapsed / 850));
-      const idx = Math.min(copy.length - 1, Math.floor(elapsed / 12000));
-      setGenerateProgress(pct, copy[idx]);
-    }, 850);
+      const pct = Math.min(maxPct, startPct + Math.floor(elapsed / tickMs));
+      const idx = Math.min(messages.length - 1, Math.floor(elapsed / messageMs));
+      setGenerateProgress(pct, messages[idx]);
+    }, tickMs);
   }
 
   function stopGenerateProgressLoop() {
@@ -1331,7 +1354,7 @@
         const result = await AIService.generateResume({
           jd: state.effectiveJD || state.jd || (state.jdTitle ? '目标岗位：' + state.jdTitle : ''),
           experiences: state.experiences,
-          requirements: (state.requirements || '') + ' 必须输出更高密度的一页 A4 简历：优先扩写实习经历，真实公司/岗位经历必须放入实习经历，不能放入项目经历；再扩写项目、创业/校园经历，补足 20-26 条 STAR bullet；每条 bullet 必须约一行半到两行，结尾自然总结能力价值。最相关经历放前面，不太相关经历也要包装成目标岗位迁移能力，不要完全删除。教育经历补充奖项、GPA、排名、语言能力等。不要用技能与个人概述凑版面，除非经历素材极少。不要提示用户内容不足，不要让用户自行选择，不要编造事实。',
+          requirements: (state.requirements || '') + ' 必须输出更高密度的一页 A4 简历：优先扩写实习经历，真实公司/岗位经历必须放入实习经历，不能放入项目经历；再扩写项目、创业/校园经历，补足 20-26 条 STAR bullet；每条中文 bullet 尽量 70-95 个汉字，在预览区约一行半到两行，结尾自然总结能力价值。最相关经历放前面，不太相关经历也要包装成目标岗位迁移能力，不要完全删除。教育经历补充奖项、GPA、排名、语言能力等。不要用技能与个人概述凑版面，除非经历素材极少。不要提示用户内容不足，不要让用户自行选择，不要编造事实。',
           previousContent: getCurrentResumeText()
         });
         if (result.raw) {
@@ -1368,20 +1391,24 @@
     const btns = [document.getElementById('downloadBtn'), document.getElementById('downloadBtn2')].filter(Boolean);
     btns.forEach(b => { b.textContent = '导出中…'; b.disabled = true; });
     try {
-      const clone = preview.cloneNode(true);
-      clone.style.position = 'fixed'; clone.style.left = '-9999px'; clone.style.top = '0'; clone.style.zIndex = '-1';
-      clone.style.width = ResumeRenderer.A4_WIDTH + 'px';
-      clone.style.minHeight = ResumeRenderer.A4_HEIGHT + 'px';
-      document.body.appendChild(clone);
-      await new Promise(r => setTimeout(r, 300));
-      const canvas = await html2canvas(clone, { width: ResumeRenderer.A4_WIDTH, height: ResumeRenderer.A4_HEIGHT, scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-      document.body.removeChild(clone);
+      await document.fonts?.ready;
+      const rect = preview.getBoundingClientRect();
+      const canvas = await html2canvas(preview, {
+        width: Math.ceil(rect.width),
+        height: Math.ceil(rect.height),
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        windowWidth: document.documentElement.clientWidth,
+        windowHeight: document.documentElement.clientHeight
+      });
       const jsPDF = window.jspdf?.jsPDF;
       if (jsPDF) {
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
         const pageWidth = pdf.internal.pageSize.getWidth();
         const pageHeight = pdf.internal.pageSize.getHeight();
         pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight);
+        addPdfLinks(pdf, preview, pageWidth, pageHeight);
         pdf.save('resume.pdf');
       } else {
         const a = document.createElement('a');
@@ -1395,6 +1422,33 @@
       showToast('下载完成', 'success');
     } catch (err) { console.error(err); showToast('导出失败', 'error'); }
     finally { btns.forEach(b => { b.textContent = '下载 PDF'; b.disabled = false; }); }
+  }
+
+  function addPdfLinks(pdf, preview, pageWidth, pageHeight) {
+    const pageRect = preview.getBoundingClientRect();
+    if (!pageRect.width || !pageRect.height || !pdf.link) return;
+    preview.querySelectorAll('a[href]').forEach(a => {
+      const href = a.getAttribute('href');
+      if (!href) return;
+      const r = a.getBoundingClientRect();
+      const x = (r.left - pageRect.left) / pageRect.width * pageWidth;
+      const y = (r.top - pageRect.top) / pageRect.height * pageHeight;
+      const w = r.width / pageRect.width * pageWidth;
+      const h = r.height / pageRect.height * pageHeight;
+      if (w > 0 && h > 0) pdf.link(x, y, w, h, { url: href });
+    });
+  }
+
+  function handleBoldSelection() {
+    const editor = document.getElementById('editorArea');
+    const sel = window.getSelection();
+    if (!editor || !sel || !sel.rangeCount || sel.getRangeAt(0).collapsed || !editor.contains(sel.anchorNode)) {
+      showToast('请先选中要加粗的文字', 'info');
+      return;
+    }
+    editor.focus();
+    document.execCommand('bold', false, null);
+    syncEditorAfterManualChange();
   }
 
   // ── Rewrite ──

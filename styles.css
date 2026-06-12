@@ -699,6 +699,11 @@ textarea, input { font-family: inherit; }
   border-bottom: 1px solid var(--border-light);
   flex-shrink: 0;
 }
+.edit-left-label--active {
+  color: var(--text);
+  font-weight: 800;
+  background: #f0eee7;
+}
 .edit-left-content-wrapper { flex: 1; overflow-y: auto; position: relative; }
 
 .editor-area {
@@ -724,8 +729,8 @@ textarea, input { font-family: inherit; }
 .editor-area p { line-height: 1.6; margin: 1px 0; }
 .resume-item {
   position: relative;
-  margin: 5px 0 8px;
-  padding: 4px 6px 3px;
+  margin: 2px 0 3px;
+  padding: 1px 4px 1px 24px;
   border: 1px solid transparent;
 }
 .resume-item:hover {
@@ -742,23 +747,30 @@ textarea, input { font-family: inherit; }
   border-bottom: 2px solid var(--text);
 }
 .resume-item-tools {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   position: absolute;
-  right: 4px;
-  top: -18px;
+  left: 1px;
+  top: 5px;
+  min-width: 18px;
+  min-height: 32px;
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 800;
-  background: var(--bg);
+  background: #f0eee7;
   border: 1px solid var(--border);
-  padding: 2px 5px;
+  padding: 2px 3px;
   cursor: grab;
   pointer-events: auto;
   user-select: none;
+  writing-mode: vertical-rl;
+  line-height: 1;
 }
 .resume-item-tools:active { cursor: grabbing; }
 .resume-item:hover .resume-item-tools {
-  display: block;
+  color: var(--text);
+  border-color: var(--text);
 }
 .resume-head {
   position: relative;
@@ -791,7 +803,8 @@ textarea, input { font-family: inherit; }
 .resume-photo img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: cover !important;
+  object-position: center;
   display: block;
 }
 .resume-meta-row {
@@ -950,6 +963,7 @@ textarea, input { font-family: inherit; }
   border-color: transparent !important;
   background: transparent !important;
   padding: 0;
+  margin: 0 0 2px !important;
 }
 .preview-a4-page .resume-item-tools {
   display: none !important;
