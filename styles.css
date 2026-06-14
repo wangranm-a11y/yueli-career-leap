@@ -912,6 +912,21 @@ textarea, input { font-family: inherit; }
   color: #1a1a1a;
   box-sizing: border-box;
 }
+.pdf-export-stage {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: var(--a4-width);
+  height: var(--a4-height);
+  pointer-events: none;
+  overflow: hidden;
+  z-index: -1;
+  background: #fff;
+}
+.pdf-export-stage .pdf-export-page {
+  display: block;
+  box-shadow: none !important;
+}
 .preview-a4-page h2 { font-size: calc(17px * var(--resume-fit-scale)); font-weight: 700; text-align: center; margin: 0 0 calc(1px * var(--resume-fit-scale)); }
 .preview-a4-page h3 { font-size: calc(11.2px * var(--resume-fit-scale)); font-weight: 700; border-bottom: 1.4px solid #1a1a1a; padding-bottom: calc(1px * var(--resume-fit-scale)); margin: calc(7px * var(--resume-fit-scale)) 0 calc(4px * var(--resume-fit-scale)); letter-spacing: 1px; }
 .preview-a4-page p { font-size: calc(9.8px * var(--resume-fit-scale)); line-height: 1.45; margin: 0 0 calc(2px * var(--resume-fit-scale)); }

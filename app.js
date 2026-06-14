@@ -1757,47 +1757,72 @@
       if (fit.isOverflow) {
         showToast('内容偏多，已自动压缩字号和间距以避免导出裁切', 'info');
       }
-      const rect = preview.getBoundingClientRect();
-      const pageCssWidth = Math.ceil(rect.width || ResumeRenderer.A4_WIDTH);
-      const pageCssHeight = Math.ceil(pageCssWidth * (ResumeRenderer.A4_HEIGHT / ResumeRenderer.A4_WIDTH));
-      const canvas = await html2canvas(preview, {
-        width: pageCssWidth,
-        height: pageCssHeight,
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        windowWidth: document.documentElement.clientWidth,
-        windowHeight: document.documentElement.clientHeight,
-        onclone: (doc) => {
-          const cloned = doc.getElementById('previewA4');
-          if (cloned) {
-            cloned.style.width = pageCssWidth + 'px';
-            cloned.style.height = pageCssHeight + 'px';
-            cloned.style.minHeight = pageCssHeight + 'px';
-            cloned.style.overflow = 'hidden';
-          }
+      const exportNode = createPdfExportNode(preview);
+      const pageCssWidth = ResumeRenderer.A4_WIDTH;
+      const pageCssHeight = ResumeRenderer.A4_HEIGHT;
+      document.body.appendChild(exportNode.stage);
+      try {
+        const canvas = await html2canvas(exportNode.page, {
+          width: pageCssWidth,
+          height: pageCssHeight,
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: pageCssWidth,
+          windowHeight: pageCssHeight
+        });
+        const jsPDF = window.jspdf?.jsPDF;
+        if (jsPDF) {
+          const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight);
+          addPdfLinks(pdf, exportNode.page, pageWidth, pageHeight);
+          pdf.save(lang === 'en' ? 'resume-en.pdf' : 'resume-zh.pdf');
+        } else {
+          const a = document.createElement('a');
+          a.href = canvas.toDataURL('image/png');
+          a.download = lang === 'en' ? 'resume-en.png' : 'resume-zh.png';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          showToast('PDF 组件未加载，已降级导出 PNG', 'warning');
         }
-      });
-      const jsPDF = window.jspdf?.jsPDF;
-      if (jsPDF) {
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight);
-        addPdfLinks(pdf, preview, pageWidth, pageHeight);
-        pdf.save(lang === 'en' ? 'resume-en.pdf' : 'resume-zh.pdf');
-      } else {
-        const a = document.createElement('a');
-        a.href = canvas.toDataURL('image/png');
-        a.download = lang === 'en' ? 'resume-en.png' : 'resume-zh.png';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        showToast('PDF 组件未加载，已降级导出 PNG', 'warning');
+      } finally {
+        exportNode.stage.remove();
       }
     } finally {
       state.currentLang = previousLang;
     }
+  }
+
+  function createPdfExportNode(preview) {
+    const stage = document.createElement('div');
+    stage.className = 'pdf-export-stage';
+    stage.setAttribute('aria-hidden', 'true');
+
+    const page = preview.cloneNode(true);
+    page.id = 'previewA4Export';
+    page.classList.add('pdf-export-page');
+    page.removeAttribute('contenteditable');
+    page.style.width = ResumeRenderer.A4_WIDTH + 'px';
+    page.style.height = ResumeRenderer.A4_HEIGHT + 'px';
+    page.style.minHeight = ResumeRenderer.A4_HEIGHT + 'px';
+    page.style.maxHeight = ResumeRenderer.A4_HEIGHT + 'px';
+    page.style.overflow = 'hidden';
+    page.style.boxShadow = 'none';
+    page.style.transform = 'none';
+    page.style.margin = '0';
+    page.style.setProperty('--resume-fit-scale', preview.style.getPropertyValue('--resume-fit-scale') || '1');
+    page.style.setProperty('--resume-pad-top', preview.style.getPropertyValue('--resume-pad-top') || '34px');
+    page.style.setProperty('--resume-pad-x', preview.style.getPropertyValue('--resume-pad-x') || '52px');
+    page.style.setProperty('--resume-pad-bottom', preview.style.getPropertyValue('--resume-pad-bottom') || '38px');
+    page.querySelectorAll('.resume-item-tools, .selection-toolbar, #selectionToolbar, #rewritePopover').forEach(el => el.remove());
+
+    stage.appendChild(page);
+    return { stage, page };
   }
 
   function addPdfLinks(pdf, preview, pageWidth, pageHeight) {
