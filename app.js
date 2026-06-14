@@ -32,6 +32,7 @@
     currentVersionIdx: -1,
     isGenerating: false,
     generateProgressTimer: null,
+    forceSupplementarySections: false,
     selectedRange: null,
     selectionMark: null,
     draggedResumeItem: null,
@@ -1217,6 +1218,7 @@
     const densityRequirement = [
       '默认生成一页 A4 高密度简历，不要生成半页或留大空白。',
       '优先写教育经历、实习经历、项目经历、创业/校园经历；有公司/岗位/时间的经历必须归入实习经历或工作经历。',
+      '如果核心实习经历不足以铺满一页，必须从用户提供的其他经历素材里继续筛选校园、创业、课程项目、比赛、作品经历补充版面；不要只写最相关的一两段。',
       '每段核心经历至少 2-4 条 bullet，每条中文 bullet 尽量 70-95 个汉字，接近一行半到两行。',
       '每条 bullet 遵循 STAR：背景/任务、行动、结果，并自然回扣目标岗位能力。',
       '技能和个人概述只在经历极少时兜底，不要每次都靠它们凑版面。',
@@ -1249,6 +1251,7 @@
     });
 
     state.isGenerating = true;
+    state.forceSupplementarySections = false;
     const btn = document.getElementById('generateBtn');
     btn.disabled = true; btn.textContent = '⏳ 分析中…';
     if (state.resumeZH || state.resumeEN) saveSnapshot('生成前备份');
@@ -1281,7 +1284,15 @@
       startAutoFillProgressLoop();
       const fill = checkPageFill();
       if (fill.needsFill) {
-        await autoFillToFit(4, { silent: true, targetPct: PAGE_FILL_TARGET_AFTER_AUTOFILL });
+        await autoFillToFit(6, { silent: true, targetPct: PAGE_FILL_TARGET });
+      }
+      let finalFill = checkPageFill();
+      if (finalFill.needsFill || finalFill.pct < PAGE_FILL_TARGET) {
+        applyUnderfillFallback('generate_final_guard');
+        finalFill = checkPageFill();
+      }
+      if (finalFill.needsFill || finalFill.pct < PAGE_FILL_TARGET_AFTER_AUTOFILL) {
+        showToast('内容仍偏少，已自动打开兜底板块；建议补充更多原始经历可继续压满页面', 'warning');
       }
       stopGenerateProgressLoop();
       saveSnapshot(state.jdTitle ? '岗位: ' + state.jdTitle : '初始生成');
@@ -1534,7 +1545,7 @@
       });
       L.push('</div>');
     }
-    const showSupplementary = shouldShowSupplementary(c);
+    const showSupplementary = state.forceSupplementarySections || shouldShowSupplementary(c);
     if (showSupplementary && c.skills && c.skills.length) {
       const validSkills = c.skills.filter(s => s.category && (Array.isArray(s.items) ? s.items.length > 0 : s.items));
       if (validSkills.length > 0) {
@@ -1559,6 +1570,99 @@
     const coreItems = [...asArray(c.experiences), ...asArray(c.projects), ...asArray(c.campus)];
     const bulletCount = coreItems.reduce((sum, item) => sum + asArray(item.highlights).length, 0);
     return coreItems.length < 4 || bulletCount < 12;
+  }
+
+  function applyUnderfillFallback(reason) {
+    const content = state.currentLang === 'zh' ? state.resumeZH : state.resumeEN;
+    if (!content || typeof content !== 'object') return false;
+    state.forceSupplementarySections = true;
+    enrichSparseResume(content, reason);
+    clearEditorDrafts();
+    renderEditor();
+    renderPreview();
+    return true;
+  }
+
+  function enrichSparseResume(c, reason) {
+    const targetText = [state.effectiveJD, state.jd, state.jdTitle].filter(Boolean).join('\n');
+    const sourceText = [state.experiences, state.requirements, targetText].filter(Boolean).join('\n');
+    [...asArray(c.experiences), ...asArray(c.projects), ...asArray(c.campus)].forEach(item => {
+      item.highlights = asArray(item.highlights).map(h => densifyBullet(h, targetText));
+    });
+    if (!asArray(c.skills).length) c.skills = deriveSkillsFromSource(sourceText);
+    if (!c.summary) c.summary = buildFallbackSummary(sourceText, targetText);
+    if (asArray(c.education).length) {
+      c.education = c.education.map(edu => {
+        if (edu.notes && String(edu.notes).length >= 28) return edu;
+        const eduAddons = deriveEducationAddons(sourceText);
+        if (!eduAddons) return edu;
+        return Object.assign({}, edu, {
+          notes: [edu.notes, eduAddons].filter(Boolean).join(' | ')
+        });
+      });
+    }
+  }
+
+  function densifyBullet(text, targetText) {
+    const original = String(text || '').trim();
+    if (!original || original.length >= 58) return original;
+    if (/能力|意识|经验|方法|判断|闭环|协作|复盘|洞察|拆解/.test(original.slice(-22))) return original;
+    const suffix = pickAbilitySuffix(targetText, original);
+    return original.replace(/[。；;,\s]*$/, '') + suffix;
+  }
+
+  function pickAbilitySuffix(targetText, bulletText) {
+    const t = [targetText, bulletText].join(' ');
+    if (/产品|需求|用户|PM|prd|原型|交互/i.test(t)) return '，沉淀了用户洞察、需求拆解和产品方案表达能力。';
+    if (/运营|社群|活动|增长|私域|转化|内容/i.test(t)) return '，体现了用户运营、链路设计和结果复盘能力。';
+    if (/市场|品牌|传播|营销|投放|渠道/i.test(t)) return '，强化了市场洞察、资源整合和传播策略能力。';
+    if (/咨询|战略|商业|竞品|行业|分析/i.test(t)) return '，体现了结构化分析、商业判断和问题拆解能力。';
+    if (/数据|SQL|Python|Tableau|A\/B|指标/i.test(t)) return '，沉淀了数据分析、指标拆解和结果验证能力。';
+    return '，体现了目标拆解、跨方协作和项目闭环能力。';
+  }
+
+  function deriveSkillsFromSource(text) {
+    const s = String(text || '');
+    const groups = [
+      { category: '产品与研究', keys: ['用户访谈', '用户调研', '问卷', '需求分析', '竞品分析', 'PRD', '原型', 'Prompt', '可用性测试'] },
+      { category: '数据分析', keys: ['SQL', 'Python', 'Excel', 'Tableau', 'A/B测试', '数据复盘', '转化率', '漏斗', 'GMV', 'DAU'] },
+      { category: '运营增长', keys: ['社群运营', '私域', '活动策划', '内容运营', '用户增长', 'SOP', '公众号', '小程序'] },
+      { category: '协作工具', keys: ['飞书', 'Notion', 'Figma', 'Axure', '墨刀', 'GitHub', 'Markdown', 'PPT'] },
+      { category: '语言能力', keys: ['英语', '法语', '雅思', '托福', 'CET', 'IELTS', 'TOEFL'] }
+    ];
+    return groups
+      .map(group => ({
+        category: group.category,
+        items: group.keys.filter(key => new RegExp(escapeRegExp(key), 'i').test(s)).slice(0, 8)
+      }))
+      .filter(group => group.items.length);
+  }
+
+  function deriveEducationAddons(text) {
+    const s = String(text || '');
+    const parts = [];
+    const gpa = s.match(/GPA\s*[:：]?\s*\d(?:\.\d+)?\s*\/\s*\d(?:\.\d+)?/i);
+    if (gpa) parts.push(gpa[0]);
+    const rank = s.match(/(?:排名|前)\s*[:：]?\s*(?:前)?\s*\d+(?:\.\d+)?%?|专业前\s*\d+(?:\.\d+)?%/);
+    if (rank) parts.push(rank[0]);
+    const awards = Array.from(s.matchAll(/国家奖学金|奖学金|优秀学生|一等奖|二等奖|三等奖|优秀奖|荣誉/g)).map(m => m[0]);
+    parts.push(...Array.from(new Set(awards)).slice(0, 3));
+    return Array.from(new Set(parts)).slice(0, 5).join(' | ');
+  }
+
+  function buildFallbackSummary(sourceText, targetText) {
+    const t = [sourceText, targetText].join(' ');
+    const abilities = [];
+    if (/用户|需求|访谈|调研|产品|PRD|原型/.test(t)) abilities.push('用户研究与需求拆解');
+    if (/数据|SQL|Python|Tableau|A\/B|指标|转化|GMV|DAU/.test(t)) abilities.push('数据分析与结果复盘');
+    if (/活动|社群|运营|增长|私域|内容/.test(t)) abilities.push('运营增长与项目执行');
+    if (/竞品|市场|品牌|商业|咨询|行业/.test(t)) abilities.push('竞品研究与商业判断');
+    const picked = abilities.length ? abilities.slice(0, 3).join('、') : '信息整理、跨方协作与项目推进';
+    return '具备' + picked + '经验，能够从真实业务场景中拆解问题、组织材料并推进落地，适合需要快速理解用户、整合资源并输出结构化成果的岗位。';
+  }
+
+  function escapeRegExp(str) {
+    return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   function renderPreview() {
@@ -1653,15 +1757,17 @@
     maxRetries = maxRetries || 2;
     options = options || {};
     const targetPct = options.targetPct || PAGE_FILL_TARGET_AFTER_AUTOFILL;
+    let lastFill = checkPageFill();
     try {
       for (let i = 0; i < maxRetries; i++) {
         const fillState = checkPageFill();
-        if (!fillState.needsFill || fillState.pct >= targetPct) return;
+        lastFill = fillState;
+        if (!fillState.needsFill || fillState.pct >= targetPct) return fillState;
         if (!options.silent) showToast('AI 正在自动补满一页 (' + (i+1) + '/' + maxRetries + ')…', 'info');
         const result = await AIService.generateResume({
           jd: state.effectiveJD || state.jd || (state.jdTitle ? '目标岗位：' + state.jdTitle : ''),
           experiences: state.experiences,
-          requirements: (state.requirements || '') + ' 必须输出更高密度的一页 A4 简历：优先扩写实习经历，真实公司/岗位经历必须放入实习经历，不能放入项目经历；再扩写项目、创业/校园经历，补足 20-26 条 STAR bullet；每条中文 bullet 尽量 70-95 个汉字，在预览区约一行半到两行，结尾自然总结能力价值。最相关经历放前面，不太相关经历也要包装成目标岗位迁移能力，不要完全删除。教育经历补充奖项、GPA、排名、语言能力等。不要用技能与个人概述凑版面，除非经历素材极少。不要提示用户内容不足，不要让用户自行选择，不要编造事实。',
+          requirements: (state.requirements || '') + ' 当前上一版简历只占 A4 约 ' + fillState.pct + '%，没有铺满页面，必须重写为更高密度的一页 A4。优先级如下：1）保留并扩写真实实习经历，真实公司/岗位经历必须放入实习经历，不能放入项目经历；2）必须检查原始经历素材里是否还有未写入的项目、创业、校园、比赛、作品经历，只要存在就新增到项目经历或创业/校园经历，不要只扩写已有段落；3）不太相关经历也要包装成目标岗位迁移能力，用来补足版面，不能因为不够相关就删掉；4）补足 22-28 条 STAR bullet，每条中文 bullet 70-95 个汉字，在预览区约一行半到两行，结尾自然总结能力价值；5）教育经历补充奖项、GPA、排名、语言能力等事实；6）只有原始素材确实没有其他经历时，最后才补充技能与个人概述。不要提示用户内容不足，不要让用户自行选择，不要编造事实。',
           previousContent: getCurrentResumeText()
         });
         if (result.raw) {
@@ -1676,13 +1782,19 @@
         }
         renderEditor(); renderPreview();
         const after = checkPageFill();
-        if (!after.needsFill || after.pct >= targetPct) return;
+        lastFill = after;
+        if (!after.needsFill || after.pct >= targetPct) return after;
       }
     } catch (err) {
       console.error(err);
       if (!options.silent) showToast('AI 补充失败', 'error');
     }
-    checkPageFill();
+    lastFill = checkPageFill();
+    if (lastFill.needsFill || lastFill.pct < targetPct) {
+      applyUnderfillFallback('autofill_final_guard');
+      lastFill = checkPageFill();
+    }
+    return lastFill;
   }
 
   async function handleAIFill() {
