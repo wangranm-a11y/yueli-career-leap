@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跃历后台数据</title>
+<style>
+  :root {
+    --bg: #f4f1ea;
+    --paper: #fbfaf6;
+    --ink: #222;
+    --muted: #77736a;
+    --line: #d3cec2;
+    --blue: #1848d6;
+    --red: #9a2c2c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
+  }
+  .shell { max-width: 1120px; margin: 0 auto; }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 18px;
+  }
+  h1 { margin: 0; font-size: 42px; letter-spacing: -0.02em; }
+  .hint { color: var(--muted); line-height: 1.7; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .card {
+    border: 1px solid var(--line);
+    background: var(--paper);
+    padding: 18px;
+    min-height: 116px;
+  }
+  .label { color: var(--muted); font-size: 13px; }
+  .num { margin-top: 18px; font-size: 38px; font-weight: 800; }
+  .num.blue { color: var(--blue); }
+  .num.red { color: var(--red); }
+  .panel {
+    margin-top: 18px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    padding: 18px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { color: var(--muted); font-weight: 700; }
+  code { background: #eee9dd; padding: 2px 5px; }
+  .error { color: var(--red); font-weight: 700; }
+  .setup { line-height: 1.8; }
+  @media (max-width: 820px) {
+    body { padding: 18px; }
+    header { display: block; }
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div>
+      <h1>跃历后台数据</h1>
+      <div class="hint">使用人数、生成次数、导出次数、失败次数和用户授权保存记录。</div>
+    </div>
+    <button id="refresh">刷新</button>
+  </header>
+
+  <div id="status" class="hint">正在加载...</div>
+  <div id="dashboard" style="display:none">
+    <div class="grid" id="cards"></div>
+    <section class="panel">
+      <h2>最近授权保存记录</h2>
+      <table>
+        <thead>
+          <tr><th>时间</th><th>岗位</th><th>模式</th><th>用户</th><th>备注</th></tr>
+        </thead>
+        <tbody id="records"></tbody>
+      </table>
+    </section>
+  </div>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token') || localStorage.getItem('yueli_admin_token') || '';
+  if (token) localStorage.setItem('yueli_admin_token', token);
+
+  const labels = [
+    ['users', '使用人数', 'blue'],
+    ['generateSuccess', '简历生成成功', 'blue'],
+    ['generateFailed', '生成失败', 'red'],
+    ['exportPdf', 'PDF 导出', 'blue'],
+    ['pageOpen', '页面打开', ''],
+    ['generateStart', '开始生成', ''],
+    ['rewriteSuccess', '局部改写成功', ''],
+    ['savedRecords', '授权保存记录', '']
+  ];
+
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function renderCards(totals) {
+    document.getElementById('cards').innerHTML = labels.map(([key, name, tone]) => `
+      <div class="card">
+        <div class="label">${name}</div>
+        <div class="num ${tone}">${totals[key] ?? 0}</div>
+      </div>
+    `).join('');
+  }
+
+  function renderRecords(rows) {
+    document.getElementById('records').innerHTML = (rows || []).map(row => {
+      const profile = row.input_snapshot?.profile || {};
+      const meta = row.metadata || {};
+      return `<tr>
+        <td>${esc(new Date(row.created_at).toLocaleString())}</td>
+        <td>${esc(row.jd_title || '未填')}</td>
+        <td>${esc(row.jd_mode || '')}</td>
+        <td>${esc(profile.name || '匿名/未填')}</td>
+        <td>${esc(meta.reason || '')}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5">暂无授权保存记录</td></tr>';
+  }
+
+  async function load() {
+    const status = document.getElementById('status');
+    const dashboard = document.getElementById('dashboard');
+    if (!token) {
+      status.innerHTML = '<span class="error">缺少后台 token。</span> 请使用 <code>/admin.html?token=你的后台口令</code> 打开。';
+      return;
+    }
+    status.textContent = '正在加载...';
+    dashboard.style.display = 'none';
+    try {
+      const res = await fetch('/api/admin-stats?token=' + encodeURIComponent(token));
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || '加载失败');
+      if (!data.configured) {
+        status.innerHTML = '<span class="error">Supabase 还没配置。</span> 请先在 Vercel 添加 <code>SUPABASE_URL</code> 和 <code>SUPABASE_SERVICE_ROLE_KEY</code>。';
+        return;
+      }
+      renderCards(data.totals || {});
+      renderRecords(data.recentRecords || []);
+      status.textContent = '已更新：' + new Date().toLocaleString();
+      dashboard.style.display = '';
+    } catch (err) {
+      status.innerHTML = '<span class="error">' + esc(err.message || '加载失败') + '</span>';
+    }
+  }
+
+  document.getElementById('refresh').addEventListener('click', load);
+  load();
+</script>
+</body>
+</html>

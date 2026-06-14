@@ -595,6 +595,33 @@ textarea, input { font-family: inherit; }
 
 /* Generate */
 .generate-area { text-align: center; margin-top: 8px; }
+.privacy-options {
+  width: min(760px, 100%);
+  margin: 0 auto 18px;
+  padding: 14px 16px;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.42);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.privacy-options p {
+  margin: 0 0 8px;
+}
+.privacy-options label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.privacy-options input {
+  width: 16px;
+  height: 16px;
+  margin-top: 4px;
+  accent-color: var(--ink);
+  flex: 0 0 auto;
+}
 .btn-generate {
   padding: 14px 48px;
   font-size: 18px;
@@ -868,58 +895,62 @@ textarea, input { font-family: inherit; }
   align-items: flex-start;
 }
 .preview-a4-page {
+  --resume-fit-scale: 1;
+  --resume-pad-top: 34px;
+  --resume-pad-x: 52px;
+  --resume-pad-bottom: 38px;
   width: var(--a4-width);
   height: var(--a4-height);
   min-height: var(--a4-height);
   overflow: hidden;
   background: #fff;
   box-shadow: 0 4px 24px rgba(0,0,0,0.15);
-  padding: 34px 52px 38px;
+  padding: var(--resume-pad-top) var(--resume-pad-x) var(--resume-pad-bottom);
   font-family: 'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
-  font-size: 10.2px;
+  font-size: calc(10.2px * var(--resume-fit-scale));
   line-height: 1.48;
   color: #1a1a1a;
   box-sizing: border-box;
 }
-.preview-a4-page h2 { font-size: 17px; font-weight: 700; text-align: center; margin: 0 0 1px; }
-.preview-a4-page h3 { font-size: 11.2px; font-weight: 700; border-bottom: 1.4px solid #1a1a1a; padding-bottom: 1px; margin: 7px 0 4px; letter-spacing: 1px; }
-.preview-a4-page p { font-size: 9.8px; line-height: 1.45; margin: 0 0 2px; }
-.preview-a4-page ul { margin: 2px 0 0 14px; padding: 0; list-style: disc; }
-.preview-a4-page li { font-size: 9.8px; line-height: 1.43; margin-bottom: 1px; }
+.preview-a4-page h2 { font-size: calc(17px * var(--resume-fit-scale)); font-weight: 700; text-align: center; margin: 0 0 calc(1px * var(--resume-fit-scale)); }
+.preview-a4-page h3 { font-size: calc(11.2px * var(--resume-fit-scale)); font-weight: 700; border-bottom: 1.4px solid #1a1a1a; padding-bottom: calc(1px * var(--resume-fit-scale)); margin: calc(7px * var(--resume-fit-scale)) 0 calc(4px * var(--resume-fit-scale)); letter-spacing: 1px; }
+.preview-a4-page p { font-size: calc(9.8px * var(--resume-fit-scale)); line-height: 1.45; margin: 0 0 calc(2px * var(--resume-fit-scale)); }
+.preview-a4-page ul { margin: calc(2px * var(--resume-fit-scale)) 0 0 calc(14px * var(--resume-fit-scale)); padding: 0; list-style: disc; }
+.preview-a4-page li { font-size: calc(9.8px * var(--resume-fit-scale)); line-height: 1.43; margin-bottom: calc(1px * var(--resume-fit-scale)); }
 .preview-a4-page li::marker { font-weight: 800; color: #1a1a1a; }
-.preview-a4-page small { font-size: 9.5px; color: #666; font-weight: 400; }
+.preview-a4-page small { font-size: calc(9.5px * var(--resume-fit-scale)); color: #666; font-weight: 400; }
 .preview-a4-page strong { font-weight: 700; }
 .preview-a4-page .resume-head {
-  min-height: 24px;
-  margin-bottom: 3px;
+  min-height: calc(24px * var(--resume-fit-scale));
+  margin-bottom: calc(3px * var(--resume-fit-scale));
 }
 .preview-a4-page .resume-head.has-photo {
-  min-height: 78px;
-  padding-right: 74px;
+  min-height: calc(78px * var(--resume-fit-scale));
+  padding-right: calc(74px * var(--resume-fit-scale));
 }
 .preview-a4-page .resume-contact {
-  font-size: 9.8px;
+  font-size: calc(9.8px * var(--resume-fit-scale));
   color: #555;
 }
 .preview-a4-page .resume-photo {
-  width: 62px;
-  height: 76px;
+  width: calc(62px * var(--resume-fit-scale));
+  height: calc(76px * var(--resume-fit-scale));
 }
 .preview-a4-page .resume-meta-row {
-  gap: 12px;
-  margin: 5px 0 2px;
+  gap: calc(12px * var(--resume-fit-scale));
+  margin: calc(5px * var(--resume-fit-scale)) 0 calc(2px * var(--resume-fit-scale));
   line-height: 1.45;
 }
 .preview-a4-page .resume-meta-row time {
-  font-size: 9.8px;
+  font-size: calc(9.8px * var(--resume-fit-scale));
 }
 .preview-a4-page time {
-  font-size: 9.8px;
+  font-size: calc(9.8px * var(--resume-fit-scale));
   color: #555;
   white-space: nowrap;
 }
 .preview-a4-page .resume-skills p {
-  margin: 3px 0;
+  margin: calc(3px * var(--resume-fit-scale)) 0;
   line-height: 1.55;
 }
 .resume-edu-notes {
@@ -928,8 +959,8 @@ textarea, input { font-family: inherit; }
   line-height: 1.45;
 }
 .preview-a4-page .resume-edu-notes {
-  font-size: 9.8px;
-  margin: -1px 0 3px;
+  font-size: calc(9.8px * var(--resume-fit-scale));
+  margin: calc(-1px * var(--resume-fit-scale)) 0 calc(3px * var(--resume-fit-scale));
 }
 .resume-link {
   color: #1b5ca8;
@@ -978,7 +1009,7 @@ textarea, input { font-family: inherit; }
   border-color: transparent !important;
   background: transparent !important;
   padding: 0;
-  margin: 0 0 2px !important;
+  margin: 0 0 calc(2px * var(--resume-fit-scale)) !important;
 }
 .preview-a4-page .resume-item-tools {
   display: none !important;

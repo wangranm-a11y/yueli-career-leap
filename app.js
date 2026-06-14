@@ -38,8 +38,15 @@
   };
 
   const PAGE_FILL_TARGET = 98;
+  const PAGE_FILL_TARGET_AFTER_AUTOFILL = 96;
+  const PAGE_OVERFLOW_LIMIT = 99.5;
+  const MIN_RESUME_FIT_SCALE = 0.56;
   const AUTO_FILL_MIN_INPUT_CHARS = 100;
   const RESUME_STORAGE_KEY = 'yueli_resume_state_v1';
+  const ANALYTICS_SESSION_KEY = 'yueli_analytics_session_v1';
+  const SAVE_RECORD_CONSENT_KEY = 'yueli_save_record_consent_v1';
+  const CONSENT_VERSION = '2026-06-13-v1';
+  const CLIENT_VERSION = '2026-06-13-privacy-analytics';
 
   // ── Safe DOM helpers ──
   function $(s) { return document.querySelector(s); }
@@ -102,6 +109,105 @@
   function debounce(fn, delay) {
     let timer;
     return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn.apply(this, args), delay); };
+  }
+
+  function getAnalyticsSessionId() {
+    let id = localStorage.getItem(ANALYTICS_SESSION_KEY);
+    if (!id) {
+      id = 'anon_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem(ANALYTICS_SESSION_KEY, id);
+    }
+    return id;
+  }
+
+  function getSaveRecordConsent() {
+    const el = document.getElementById('saveRecordConsent');
+    return !!(el && el.checked);
+  }
+
+  function hydratePrivacyOptions() {
+    const el = document.getElementById('saveRecordConsent');
+    if (!el) return;
+    el.checked = localStorage.getItem(SAVE_RECORD_CONSENT_KEY) === 'true';
+  }
+
+  function savePrivacyOptions() {
+    localStorage.setItem(SAVE_RECORD_CONSENT_KEY, getSaveRecordConsent() ? 'true' : 'false');
+  }
+
+  function charBucket(text) {
+    const len = String(text || '').length;
+    if (len < 100) return '<100';
+    if (len < 500) return '100-499';
+    if (len < 1500) return '500-1499';
+    if (len < 4000) return '1500-3999';
+    return '4000+';
+  }
+
+  function trackEvent(eventName, payload = {}) {
+    const body = {
+      eventName,
+      sessionId: getAnalyticsSessionId(),
+      payload: Object.assign({
+        view: state.currentView,
+        theme: state.theme,
+        clientVersion: CLIENT_VERSION
+      }, payload)
+    };
+    fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      keepalive: true
+    }).catch(() => {});
+  }
+
+  function buildInputSnapshot() {
+    return {
+      profile: Object.assign({}, state.manualProfile),
+      jdMode: state.jdMode,
+      jdTitle: state.jdTitle,
+      jd: state.jd,
+      effectiveJD: state.effectiveJD,
+      experiences: state.experiences,
+      requirements: state.requirements,
+      portfolioLinks: state.portfolioLinks,
+      uploadedFiles: state.uploadedFiles.map(file => ({
+        name: file.name,
+        type: file.type || '',
+        size: file.size || 0
+      }))
+    };
+  }
+
+  async function saveResumeRecord(reason = 'generate_success') {
+    if (!getSaveRecordConsent()) return;
+    const body = {
+      consent: true,
+      consentVersion: CONSENT_VERSION,
+      sessionId: getAnalyticsSessionId(),
+      inputSnapshot: buildInputSnapshot(),
+      resumeZH: state.resumeZH,
+      resumeEN: state.resumeEN,
+      metadata: {
+        reason,
+        currentLang: state.currentLang,
+        theme: state.theme,
+        versionCount: state.versions.length,
+        clientVersion: CLIENT_VERSION
+      }
+    };
+    try {
+      const response = await fetch('/api/resume-records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (data?.ok && !data.disabled) showToast('已按你的授权保存本次记录', 'success');
+    } catch (e) {
+      console.warn('Save resume record failed:', e);
+    }
   }
 
   function asArray(value) {
@@ -889,6 +995,7 @@
     on('themeSelect2', 'change', e => { state.theme = e.target.value; savePrefs(); renderPreview(); });
     on('downloadBtn', 'click', handleDownload);
     on('downloadBtn2', 'click', handleDownload);
+    on('saveRecordConsent', 'change', savePrivacyOptions);
     on('viewTabs', 'click', e => { if (e.target.classList.contains('tb-tab')) switchView(e.target.dataset.view); });
     document.addEventListener('click', e => {
       if (e.target && e.target.id === 'emptyBackToInput') switchView('input');
@@ -1089,6 +1196,7 @@
   // ── Generate ──
   async function handleGenerate() {
     if (!AIService.hasApiKey()) { openAPIKeyModal(); return; }
+    const generateStartedAt = Date.now();
     state.jdMode = document.querySelector('input[name="jdMode"]:checked')?.value || 'title';
     state.jdTitle = (document.getElementById('jdTitleInput')?.value || '').trim();
     state.jd = (document.getElementById('jdInput')?.value || '').trim();
@@ -1099,6 +1207,14 @@
       ? '\n\n--- 作品集链接（第一版仅展示链接，不读取外网内容）---\n' + state.portfolioLinks.join('\n')
       : '';
     const experiencesForAI = state.experiences + portfolioContext;
+    const densityRequirement = [
+      '默认生成一页 A4 高密度简历，不要生成半页或留大空白。',
+      '优先写教育经历、实习经历、项目经历、创业/校园经历；有公司/岗位/时间的经历必须归入实习经历或工作经历。',
+      '每段核心经历至少 2-4 条 bullet，每条中文 bullet 尽量 70-95 个汉字，接近一行半到两行。',
+      '每条 bullet 遵循 STAR：背景/任务、行动、结果，并自然回扣目标岗位能力。',
+      '技能和个人概述只在经历极少时兜底，不要每次都靠它们凑版面。',
+      '不要编造公司、岗位、时间、奖项和数据；没有事实就弱化表达。'
+    ].join('\n');
 
     if (!state.jdTitle && !state.jd) { showToast('请输入岗位名或 JD', 'warning'); return; }
     if (!state.manualProfile.name) { showToast('请先填写姓名', 'warning'); document.getElementById('profileNameInput')?.focus(); return; }
@@ -1113,6 +1229,17 @@
       effectiveJD += '\n[用户上传了 JD 截图，但当前应用无法读取图片文字；只能依据已输入的岗位名/JD 文本生成。]';
     }
     state.effectiveJD = effectiveJD;
+    trackEvent('generate_start', {
+      jdMode: state.jdMode,
+      hasFullJD: !!state.jd,
+      hasJobTitle: !!state.jdTitle,
+      hasRequirements: !!state.requirements,
+      hasPortfolioLinks: state.portfolioLinks.length > 0,
+      hasPhoto: !!state.photoDataUrl,
+      fileCount: state.uploadedFiles.length,
+      experienceCharsBucket: charBucket(state.experiences),
+      saveRecordConsent: getSaveRecordConsent()
+    });
 
     state.isGenerating = true;
     const btn = document.getElementById('generateBtn');
@@ -1122,7 +1249,11 @@
 
     try {
       startGenerateProgressLoop();
-      const result = await AIService.generateResume({ jd: effectiveJD, experiences: experiencesForAI, requirements: state.requirements });
+      const result = await AIService.generateResume({
+        jd: effectiveJD,
+        experiences: experiencesForAI,
+        requirements: [state.requirements, densityRequirement].filter(Boolean).join('\n\n')
+      });
       stopGenerateProgressLoop();
       setGenerateProgress(68, '正在解析 AI 返回结果…', false, '解析结果…');
       if (result.raw) {
@@ -1143,11 +1274,24 @@
       startAutoFillProgressLoop();
       const fill = checkPageFill();
       if (fill.needsFill) {
-        await autoFillToFit(4, { silent: true });
+        await autoFillToFit(4, { silent: true, targetPct: PAGE_FILL_TARGET_AFTER_AUTOFILL });
       }
       stopGenerateProgressLoop();
       saveSnapshot(state.jdTitle ? '岗位: ' + state.jdTitle : '初始生成');
       persistResumeState();
+      trackEvent('generate_success', {
+        jdMode: state.jdMode,
+        hasFullJD: !!state.jd,
+        hasJobTitle: !!state.jdTitle,
+        hasRequirements: !!state.requirements,
+        hasPortfolioLinks: state.portfolioLinks.length > 0,
+        hasPhoto: !!state.photoDataUrl,
+        fileCount: state.uploadedFiles.length,
+        experienceCharsBucket: charBucket(state.experiences),
+        saveRecordConsent: getSaveRecordConsent(),
+        durationMs: Date.now() - generateStartedAt
+      });
+      await saveResumeRecord('generate_success');
       setGenerateProgress(100, '生成完成，已默认整理成一页 A4。', false, '生成完成');
       setTimeout(() => setGenerateProgress(0, ''), 700);
       showToast('简历生成完成！', 'success');
@@ -1158,6 +1302,15 @@
       if (err.message === 'API_KEY_MISSING') { msg = '站点还没有配置服务器 Key，请联系站点管理员'; }
       else if (err.message === 'API_KEY_INVALID') { msg = '自定义 Key 无效'; openAPIKeyModal(); }
       else if (err.message === 'SERVER_API_KEY_INVALID') { msg = '站点服务器 Key 无效，请联系站点管理员'; }
+      trackEvent('generate_failed', {
+        jdMode: state.jdMode,
+        hasFullJD: !!state.jd,
+        hasJobTitle: !!state.jdTitle,
+        fileCount: state.uploadedFiles.length,
+        experienceCharsBucket: charBucket(state.experiences),
+        errorType: msg,
+        durationMs: Date.now() - generateStartedAt
+      });
       setGenerateProgress(0, '<span style="color:#c7512e;">' + escHTML(msg) + '</span>', true);
       showToast(msg, 'error');
       if (hasResumeContent()) {
@@ -1403,12 +1556,20 @@
       return;
     }
     previewEl.innerHTML = editorEl.innerHTML;
+    fitPreviewToSinglePage();
   }
 
-  function checkPageFill() {
-    const preview = document.getElementById('previewA4');
-    const prompt = document.getElementById('fillPrompt');
-    if (!preview || !prompt) return { pct: 100, needsFill: false };
+  function resetPreviewFit(preview) {
+    if (!preview) return;
+    preview.style.setProperty('--resume-fit-scale', '1');
+    preview.style.setProperty('--resume-pad-top', '34px');
+    preview.style.setProperty('--resume-pad-x', '52px');
+    preview.style.setProperty('--resume-pad-bottom', '38px');
+    preview.dataset.fitScale = '1';
+    preview.dataset.overflow = 'false';
+  }
+
+  function getPreviewContentMetrics(preview) {
     const children = Array.from(preview.children).filter(el => el.offsetParent !== null);
     let bottom = 0;
     const pageTop = preview.getBoundingClientRect().top;
@@ -1416,20 +1577,70 @@
       const rect = el.getBoundingClientRect();
       bottom = Math.max(bottom, rect.bottom - pageTop);
     });
-    const contentHeight = Math.max(0, bottom - 44);
-    const usableHeight = ResumeRenderer.A4_HEIGHT - 96;
-    const pct = Math.min(150, Math.round(contentHeight / usableHeight * 100));
+    const style = getComputedStyle(preview);
+    const padBottom = parseFloat(style.paddingBottom) || 0;
+    const contentHeight = Math.max(0, bottom + padBottom);
+    const pageHeight = preview.clientHeight || ResumeRenderer.A4_HEIGHT;
+    return {
+      contentHeight,
+      pageHeight,
+      pct: pageHeight ? Math.round(contentHeight / pageHeight * 1000) / 10 : 100
+    };
+  }
+
+  function fitPreviewToSinglePage() {
+    const preview = document.getElementById('previewA4');
+    if (!preview || !preview.innerHTML.trim() || preview.querySelector('.resume-empty-state')) {
+      return { pct: 100, isOverflow: false, scale: 1 };
+    }
+    resetPreviewFit(preview);
+    let metrics = getPreviewContentMetrics(preview);
+    if (metrics.contentHeight <= metrics.pageHeight * (PAGE_OVERFLOW_LIMIT / 100)) {
+      return { pct: metrics.pct, isOverflow: false, scale: 1 };
+    }
+
+    const rawScale = (metrics.pageHeight * 0.985) / metrics.contentHeight;
+    const scale = Math.max(MIN_RESUME_FIT_SCALE, Math.min(1, rawScale));
+    const padX = Math.max(40, Math.round(52 * scale));
+    const padTop = Math.max(24, Math.round(34 * scale));
+    const padBottom = Math.max(24, Math.round(38 * scale));
+    preview.style.setProperty('--resume-fit-scale', String(Math.round(scale * 1000) / 1000));
+    preview.style.setProperty('--resume-pad-top', padTop + 'px');
+    preview.style.setProperty('--resume-pad-x', padX + 'px');
+    preview.style.setProperty('--resume-pad-bottom', padBottom + 'px');
+
+    metrics = getPreviewContentMetrics(preview);
+    if (metrics.contentHeight > metrics.pageHeight && scale > MIN_RESUME_FIT_SCALE) {
+      const nextScale = Math.max(MIN_RESUME_FIT_SCALE, scale * ((metrics.pageHeight * 0.985) / metrics.contentHeight));
+      preview.style.setProperty('--resume-fit-scale', String(Math.round(nextScale * 1000) / 1000));
+      preview.style.setProperty('--resume-pad-top', Math.max(18, Math.round(34 * nextScale)) + 'px');
+      preview.style.setProperty('--resume-pad-x', Math.max(32, Math.round(52 * nextScale)) + 'px');
+      preview.style.setProperty('--resume-pad-bottom', Math.max(18, Math.round(38 * nextScale)) + 'px');
+      metrics = getPreviewContentMetrics(preview);
+    }
+    preview.dataset.fitScale = String(scale);
+    preview.dataset.overflow = metrics.contentHeight > metrics.pageHeight ? 'true' : 'false';
+    return { pct: metrics.pct, isOverflow: metrics.contentHeight > metrics.pageHeight, scale };
+  }
+
+  function checkPageFill() {
+    const preview = document.getElementById('previewA4');
+    const prompt = document.getElementById('fillPrompt');
+    if (!preview || !prompt) return { pct: 100, needsFill: false };
+    const fit = fitPreviewToSinglePage();
+    const pct = Math.min(150, Math.round(fit.pct));
     prompt.style.display = 'none';
-    return { pct, needsFill: pct < PAGE_FILL_TARGET };
+    return { pct, needsFill: pct < PAGE_FILL_TARGET, isOverflow: fit.isOverflow, scale: fit.scale };
   }
 
   async function autoFillToFit(maxRetries, options) {
     maxRetries = maxRetries || 2;
     options = options || {};
+    const targetPct = options.targetPct || PAGE_FILL_TARGET_AFTER_AUTOFILL;
     try {
       for (let i = 0; i < maxRetries; i++) {
-        const { needsFill } = checkPageFill();
-        if (!needsFill) return;
+        const fillState = checkPageFill();
+        if (!fillState.needsFill || fillState.pct >= targetPct) return;
         if (!options.silent) showToast('AI 正在自动补满一页 (' + (i+1) + '/' + maxRetries + ')…', 'info');
         const result = await AIService.generateResume({
           jd: state.effectiveJD || state.jd || (state.jdTitle ? '目标岗位：' + state.jdTitle : ''),
@@ -1448,6 +1659,8 @@
           clearEditorDrafts();
         }
         renderEditor(); renderPreview();
+        const after = checkPageFill();
+        if (!after.needsFill || after.pct >= targetPct) return;
       }
     } catch (err) {
       console.error(err);
@@ -1509,6 +1722,11 @@
         }
         await exportResumePDF(lang);
       }
+      trackEvent('export_pdf', {
+        languages: langs,
+        hasPhoto: !!state.photoDataUrl,
+        saveRecordConsent: getSaveRecordConsent()
+      });
       state.currentLang = originalLang;
       $$('.et-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === originalLang));
       renderEditor(); renderPreview(); checkPageFill();
@@ -1535,6 +1753,10 @@
     }
     try {
       await document.fonts?.ready;
+      const fit = fitPreviewToSinglePage();
+      if (fit.isOverflow) {
+        showToast('内容偏多，已自动压缩字号和间距以避免导出裁切', 'info');
+      }
       const rect = preview.getBoundingClientRect();
       const pageCssWidth = Math.ceil(rect.width || ResumeRenderer.A4_WIDTH);
       const pageCssHeight = Math.ceil(pageCssWidth * (ResumeRenderer.A4_HEIGHT / ResumeRenderer.A4_WIDTH));
@@ -1791,6 +2013,9 @@
           saveCurrentEditorDraft();
           renderPreview(); checkPageFill();
           persistResumeState();
+          trackEvent('rewrite_success', {
+            saveRecordConsent: getSaveRecordConsent()
+          });
           state.selectedRange = null;
           document.getElementById('rewritePopover').style.display = 'none';
           showToast('改写完成，已按原结构排版', 'success');
@@ -1857,6 +2082,10 @@
       await autoFillToFit(2, { silent: true });
       saveSnapshot('继续优化');
       if (input) input.value = '';
+      trackEvent('followup_success', {
+        saveRecordConsent: getSaveRecordConsent()
+      });
+      await saveResumeRecord('followup_success');
       showToast('优化完成', 'success');
     } catch (err) {
       console.error(err);
@@ -1977,6 +2206,7 @@
     try {
       const restored = loadState();
       setupEventListeners();
+      hydratePrivacyOptions();
       checkAPIKey();
       if (restored) {
         switchView('edit');
@@ -1984,6 +2214,9 @@
       } else {
         validateVisibleView();
       }
+      trackEvent('page_open', {
+        saveRecordConsent: getSaveRecordConsent()
+      });
     }
     catch (e) { console.error('Init error:', e); }
   }

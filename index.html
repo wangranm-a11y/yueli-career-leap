@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=42">
+  <link rel="stylesheet" href="styles.css?v=46">
 </head>
 <body>
 
@@ -233,6 +233,13 @@
 
     <!-- Generate Button -->
     <div class="generate-area">
+      <div class="privacy-options">
+        <p>默认只记录匿名功能统计，不保存你的简历正文、输入素材和照片。</p>
+        <label>
+          <input type="checkbox" id="saveRecordConsent">
+          <span>我同意保存本次输入与生成结果，用于问题排查和产品优化（不会保存照片和 API Key）。</span>
+        </label>
+      </div>
       <button id="generateBtn" class="btn-generate">生成简历</button>
       <div class="generate-progress" id="generateProgress" style="display:none">
         <div class="generate-progress-bar" id="generateProgressBar"></div>
@@ -331,8 +338,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="ai-service.js?v=43"></script>
-  <script src="resume-renderer.js?v=43"></script>
-  <script src="app.js?v=43"></script>
+  <script src="ai-service.js?v=46"></script>
+  <script src="resume-renderer.js?v=46"></script>
+  <script src="app.js?v=46"></script>
 </body>
 </html>
