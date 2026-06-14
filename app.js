@@ -218,6 +218,71 @@
     }
   }
 
+  function openFeedbackModal() {
+    const modal = document.getElementById('feedbackModal');
+    const text = document.getElementById('feedbackText');
+    if (modal) modal.style.display = 'flex';
+    if (text) setTimeout(() => text.focus(), 50);
+  }
+
+  function closeFeedbackModal() {
+    const modal = document.getElementById('feedbackModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  async function submitFeedback() {
+    const type = document.getElementById('feedbackType')?.value || 'other';
+    const textEl = document.getElementById('feedbackText');
+    const contactEl = document.getElementById('feedbackContact');
+    const message = (textEl?.value || '').trim();
+    const contact = (contactEl?.value || '').trim();
+    if (message.length < 4) {
+      showToast('先写一点点反馈内容吧', 'warning');
+      textEl?.focus();
+      return;
+    }
+    const btn = document.getElementById('feedbackSubmit');
+    if (btn) { btn.disabled = true; btn.textContent = '提交中…'; }
+    let fill = { pct: null, isOverflow: false };
+    try { if (state.currentView === 'edit') fill = checkPageFill(); } catch (e) {}
+    try {
+      const response = await fetch(apiEndpoint('/api/feedback'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          message,
+          contact,
+          sessionId: getAnalyticsSessionId(),
+          context: {
+            view: state.currentView,
+            currentLang: state.currentLang,
+            theme: state.theme,
+            jdMode: state.jdMode,
+            jdTitle: state.jdTitle,
+            hasResume: hasResumeContent(),
+            pageFillPct: fill.pct,
+            pageOverflow: fill.isOverflow,
+            fileCount: state.uploadedFiles.length,
+            hasPhoto: !!state.photoDataUrl,
+            clientVersion: CLIENT_VERSION
+          }
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) throw new Error(data.error || 'feedback_failed');
+      textEl.value = '';
+      if (contactEl) contactEl.value = '';
+      closeFeedbackModal();
+      showToast(data.disabled ? '反馈入口已提交，但后台数据库还没配置' : '收到，我会在后台看到这条反馈', data.disabled ? 'warning' : 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('反馈提交失败，请稍后再试', 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '提交反馈'; }
+    }
+  }
+
   function asArray(value) {
     if (!value) return [];
     return Array.isArray(value) ? value : [value];
@@ -998,6 +1063,9 @@
     on('apiKeySave', 'click', saveAPIKey);
     on('apiKeyCancel', 'click', closeAPIKeyModal);
     on('apiKeyInput', 'keydown', e => { if (e.key === 'Enter') saveAPIKey(); });
+    on('feedbackFab', 'click', openFeedbackModal);
+    on('feedbackCancel', 'click', closeFeedbackModal);
+    on('feedbackSubmit', 'click', submitFeedback);
     on('generateBtn', 'click', handleGenerate);
     on('themeSelect', 'change', e => { state.theme = e.target.value; savePrefs(); });
     on('themeSelect2', 'change', e => { state.theme = e.target.value; savePrefs(); renderPreview(); });
@@ -1007,6 +1075,7 @@
     on('viewTabs', 'click', e => { if (e.target.classList.contains('tb-tab')) switchView(e.target.dataset.view); });
     document.addEventListener('click', e => {
       if (e.target && e.target.id === 'emptyBackToInput') switchView('input');
+      if (e.target && e.target.id === 'feedbackModal') closeFeedbackModal();
     });
     const langTabs = document.querySelector('.et-lang-tabs');
     if (langTabs) langTabs.addEventListener('click', e => { if (e.target.classList.contains('et-tab')) switchLanguage(e.target.dataset.lang); });
@@ -1605,10 +1674,11 @@
 
   function densifyBullet(text, targetText) {
     const original = String(text || '').trim();
-    if (!original || original.length >= 58) return original;
-    if (/能力|意识|经验|方法|判断|闭环|协作|复盘|洞察|拆解/.test(original.slice(-22))) return original;
+    if (!original || original.length >= 88) return original;
     const suffix = pickAbilitySuffix(targetText, original);
-    return original.replace(/[。；;,\s]*$/, '') + suffix;
+    let next = original.replace(/[。；;,\s]*$/, '') + suffix;
+    if (next.length < 88) next = next.replace(/[。；;,\s]*$/, '') + pickEvidenceSuffix(targetText, original);
+    return next;
   }
 
   function pickAbilitySuffix(targetText, bulletText) {
@@ -1619,6 +1689,16 @@
     if (/咨询|战略|商业|竞品|行业|分析/i.test(t)) return '，体现了结构化分析、商业判断和问题拆解能力。';
     if (/数据|SQL|Python|Tableau|A\/B|指标/i.test(t)) return '，沉淀了数据分析、指标拆解和结果验证能力。';
     return '，体现了目标拆解、跨方协作和项目闭环能力。';
+  }
+
+  function pickEvidenceSuffix(targetText, bulletText) {
+    const t = [targetText, bulletText].join(' ');
+    if (/产品|需求|用户|PM|prd|原型|交互/i.test(t)) return '，为后续需求优先级判断、功能定义和方案沟通提供可复用依据。';
+    if (/运营|社群|活动|增长|私域|转化|内容/i.test(t)) return '，为后续活动复盘、用户分层运营和转化链路优化提供执行经验。';
+    if (/市场|品牌|传播|营销|投放|渠道/i.test(t)) return '，为后续传播策略制定、渠道协同和项目落地提供判断依据。';
+    if (/咨询|战略|商业|竞品|行业|分析/i.test(t)) return '，为后续业务诊断、竞品拆解和结构化结论输出积累方法。';
+    if (/数据|SQL|Python|Tableau|A\/B|指标/i.test(t)) return '，为后续指标监测、数据复盘和策略迭代提供可验证输入。';
+    return '，为后续复杂任务推进、资源协调和结果复盘提供可迁移经验。';
   }
 
   function deriveSkillsFromSource(text) {
@@ -1719,28 +1799,17 @@
       return { pct: metrics.pct, isOverflow: false, scale: 1 };
     }
 
-    const rawScale = (metrics.pageHeight * 0.985) / metrics.contentHeight;
-    const scale = Math.max(MIN_RESUME_FIT_SCALE, Math.min(1, rawScale));
-    const padX = Math.max(40, Math.round(52 * scale));
-    const padTop = Math.max(24, Math.round(34 * scale));
-    const padBottom = Math.max(24, Math.round(38 * scale));
-    preview.style.setProperty('--resume-fit-scale', String(Math.round(scale * 1000) / 1000));
-    preview.style.setProperty('--resume-pad-top', padTop + 'px');
-    preview.style.setProperty('--resume-pad-x', padX + 'px');
-    preview.style.setProperty('--resume-pad-bottom', padBottom + 'px');
+    // Keep font size stable. Only tighten page padding for mild overflow;
+    // underfilled resumes must be fixed by adding content, not by shrinking type.
+    preview.style.setProperty('--resume-fit-scale', '1');
+    preview.style.setProperty('--resume-pad-top', '26px');
+    preview.style.setProperty('--resume-pad-x', '42px');
+    preview.style.setProperty('--resume-pad-bottom', '28px');
 
     metrics = getPreviewContentMetrics(preview);
-    if (metrics.contentHeight > metrics.pageHeight && scale > MIN_RESUME_FIT_SCALE) {
-      const nextScale = Math.max(MIN_RESUME_FIT_SCALE, scale * ((metrics.pageHeight * 0.985) / metrics.contentHeight));
-      preview.style.setProperty('--resume-fit-scale', String(Math.round(nextScale * 1000) / 1000));
-      preview.style.setProperty('--resume-pad-top', Math.max(18, Math.round(34 * nextScale)) + 'px');
-      preview.style.setProperty('--resume-pad-x', Math.max(32, Math.round(52 * nextScale)) + 'px');
-      preview.style.setProperty('--resume-pad-bottom', Math.max(18, Math.round(38 * nextScale)) + 'px');
-      metrics = getPreviewContentMetrics(preview);
-    }
-    preview.dataset.fitScale = String(scale);
+    preview.dataset.fitScale = '1';
     preview.dataset.overflow = metrics.contentHeight > metrics.pageHeight ? 'true' : 'false';
-    return { pct: metrics.pct, isOverflow: metrics.contentHeight > metrics.pageHeight, scale };
+    return { pct: metrics.pct, isOverflow: metrics.contentHeight > metrics.pageHeight, scale: 1 };
   }
 
   function checkPageFill() {

@@ -46,6 +46,23 @@ create index if not exists yueli_resume_records_created_at_idx
 
 create index if not exists yueli_resume_records_jd_title_idx
   on yueli_resume_records (jd_title);
+
+create table if not exists yueli_feedback (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  session_id text,
+  feedback_type text not null default 'other',
+  message text not null,
+  contact text,
+  context jsonb not null default '{}'::jsonb,
+  user_agent text
+);
+
+create index if not exists yueli_feedback_created_at_idx
+  on yueli_feedback (created_at desc);
+
+create index if not exists yueli_feedback_type_idx
+  on yueli_feedback (feedback_type);
 ```
 
 ## 2. 配置 Vercel 环境变量
@@ -110,6 +127,22 @@ npx vercel@latest --prod --yes
 - 简历照片 base64
 - 用户自定义 API Key
 
+### 用户反馈表：`yueli_feedback`
+
+用户点击页面右下角「吐槽一下」后会保存：
+
+- 反馈类型
+- 反馈正文
+- 可选联系方式
+- 当前页面状态（页面、语言、主题、A4 填充率、是否溢出、文件数量等）
+
+不会保存：
+
+- 简历照片
+- API Key
+- 完整经历正文
+- 完整简历正文
+
 ## 4. 常用查询
 
 查看最近生成次数：
@@ -151,6 +184,20 @@ order by created_at desc
 limit 50;
 ```
 
+查看最近用户反馈：
+
+```sql
+select
+  created_at,
+  feedback_type,
+  message,
+  contact,
+  context
+from yueli_feedback
+order by created_at desc
+limit 50;
+```
+
 ## 5. 后台看板
 
 项目提供一个轻量后台页面：
@@ -180,8 +227,10 @@ npx vercel@latest env add ADMIN_TOKEN production
 - 生成失败次数
 - PDF 导出次数
 - 局部改写次数
+- 用户反馈数量
 - 用户主动授权保存记录数量
 - 最近 20 条授权保存记录摘要
+- 最近 30 条用户反馈
 
 ## 6. 隐私建议
 

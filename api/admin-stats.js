@@ -39,6 +39,14 @@ async function countEvents(eventName) {
   return result.disabled ? null : result.count;
 }
 
+async function supabaseGetOptional(path) {
+  try {
+    return await supabaseGet(path);
+  } catch {
+    return { disabled: false, data: [], count: 0 };
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
@@ -68,7 +76,9 @@ export default async function handler(req, res) {
       exportPdf,
       rewriteSuccess,
       followupSuccess,
-      recentRecords
+      recentRecords,
+      feedback,
+      recentFeedback
     ] = await Promise.all([
       supabaseGet('yueli_events?select=id'),
       supabaseGet('yueli_events?select=session_id'),
@@ -80,7 +90,9 @@ export default async function handler(req, res) {
       countEvents('export_pdf'),
       countEvents('rewrite_success'),
       countEvents('followup_success'),
-      supabaseGet('yueli_resume_records?select=created_at,jd_title,jd_mode,metadata,input_snapshot&order=created_at.desc&limit=20')
+      supabaseGet('yueli_resume_records?select=created_at,jd_title,jd_mode,metadata,input_snapshot&order=created_at.desc&limit=20'),
+      supabaseGetOptional('yueli_feedback?select=id'),
+      supabaseGetOptional('yueli_feedback?select=created_at,feedback_type,message,contact,context&order=created_at.desc&limit=30')
     ]);
 
     const uniqueUsers = new Set((users.data || []).map(row => row.session_id).filter(Boolean)).size;
@@ -97,9 +109,11 @@ export default async function handler(req, res) {
         generateFailed,
         exportPdf,
         rewriteSuccess,
-        followupSuccess
+        followupSuccess,
+        feedback: feedback.count
       },
-      recentRecords: recentRecords.data || []
+      recentRecords: recentRecords.data || [],
+      recentFeedback: recentFeedback.data || []
     });
   } catch (error) {
     return json(res, 500, {

@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=46">
+  <link rel="stylesheet" href="styles.css?v=50">
 </head>
 <body>
 
@@ -73,6 +73,28 @@
       <button class="btn-cancel" id="refineCancel">取消</button>
       <button class="btn-confirm" id="refineGo">开始精修</button>
     </div>
+  </div>
+</div>
+
+<!-- ====== Feedback Modal ====== -->
+<div class="modal-overlay" id="feedbackModal" style="display:none">
+  <div class="modal-card">
+    <h3>吐槽 / 提建议</h3>
+    <p class="modal-hint">哪里不好用、哪里生成得怪、你想要什么功能，都可以直接告诉我。默认只保存这条反馈和当前页面状态，不会保存照片或 API Key。</p>
+    <select id="feedbackType" class="modal-input">
+      <option value="bug">Bug / 生成错误</option>
+      <option value="resume_quality">简历质量不满意</option>
+      <option value="layout">排版问题</option>
+      <option value="feature">想要新功能</option>
+      <option value="other">其他</option>
+    </select>
+    <textarea id="feedbackText" class="modal-textarea" rows="6" placeholder="例如：简历还是没有铺满一页；某段实习被误放到了项目经历；PDF 导出和预览不一致……"></textarea>
+    <input type="text" id="feedbackContact" class="modal-input" placeholder="联系方式（可选，方便我追问）">
+    <div class="modal-actions">
+      <button class="btn-cancel" id="feedbackCancel">取消</button>
+      <button class="btn-confirm" id="feedbackSubmit">提交反馈</button>
+    </div>
+    <p class="modal-footnote">提交后会进入我的后台反馈列表。</p>
   </div>
 </div>
 
@@ -330,6 +352,7 @@
 </main>
 
 <!-- ====== Toast ====== -->
+<button class="feedback-fab" id="feedbackFab" type="button" aria-label="吐槽或提建议">吐槽一下</button>
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- ====== Scripts ====== -->
@@ -338,8 +361,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="ai-service.js?v=49"></script>
-  <script src="resume-renderer.js?v=49"></script>
-  <script src="app.js?v=49"></script>
+  <script src="ai-service.js?v=50"></script>
+  <script src="resume-renderer.js?v=50"></script>
+  <script src="app.js?v=50"></script>
 </body>
 </html>

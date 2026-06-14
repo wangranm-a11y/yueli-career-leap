@@ -1307,6 +1307,32 @@ textarea, input { font-family: inherit; }
 .modal-textarea:focus { border-color: var(--accent); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .modal-footnote { font-size: 11px; color: var(--text-muted); margin-top: 12px; text-align: center; }
+.feedback-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1200;
+  border: 1px solid rgba(14,18,14,0.22);
+  background: #202020;
+  color: #fff;
+  padding: 12px 15px;
+  border-radius: 999px;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+  font-size: 14px;
+  font-weight: 700;
+}
+.feedback-fab:hover {
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+@media (max-width: 720px) {
+  .feedback-fab {
+    right: 12px;
+    bottom: 12px;
+    padding: 10px 13px;
+    font-size: 13px;
+  }
+}
 
 .btn-confirm {
   padding: 8px 20px;
