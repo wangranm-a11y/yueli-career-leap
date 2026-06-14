@@ -1306,9 +1306,18 @@
       stopGenerateProgressLoop();
       console.error(err);
       let msg = err.message || '生成失败';
+      let progressHTML = '';
       if (err.message === 'API_KEY_MISSING') { msg = '站点还没有配置服务器 Key，请联系站点管理员'; }
       else if (err.message === 'API_KEY_INVALID') { msg = '自定义 Key 无效'; openAPIKeyModal(); }
       else if (err.message === 'SERVER_API_KEY_INVALID') { msg = '站点服务器 Key 无效，请联系站点管理员'; }
+      else if (err.message === 'AI_PROXY_UNREACHABLE' || err.message === 'AI_PROXY_TIMEOUT') {
+        msg = 'AI 后端暂时连不上';
+        progressHTML = [
+          '<strong style="color:#c7512e;">AI 后端暂时连不上。</strong>',
+          '<span>页面本身已经打开了，但生成简历需要访问后端代理。当前网络连不到默认 Vercel API，所以浏览器会显示 Failed to fetch。</span>',
+          '<span>临时办法：换网络/VPN，或点右上角 API Key 填自己的 DeepSeek Key。长期办法：把 /api/deepseek 换到国内或香港云函数代理。</span>'
+        ].join('<br>');
+      }
       trackEvent('generate_failed', {
         jdMode: state.jdMode,
         hasFullJD: !!state.jd,
@@ -1318,7 +1327,7 @@
         errorType: msg,
         durationMs: Date.now() - generateStartedAt
       });
-      setGenerateProgress(0, '<span style="color:#c7512e;">' + escHTML(msg) + '</span>', true);
+      setGenerateProgress(0, progressHTML || '<span style="color:#c7512e;">' + escHTML(msg) + '</span>', true);
       showToast(msg, 'error');
       if (hasResumeContent()) {
         switchView('edit');
@@ -2063,6 +2072,7 @@
       if (err.message === 'API_KEY_MISSING') msg = '站点还没有配置服务器 Key，请联系站点管理员';
       if (err.message === 'API_KEY_INVALID') msg = '自定义 API Key 无效';
       if (err.message === 'SERVER_API_KEY_INVALID') msg = '站点服务器 Key 无效，请联系站点管理员';
+      if (err.message === 'AI_PROXY_UNREACHABLE' || err.message === 'AI_PROXY_TIMEOUT') msg = 'AI 后端暂时连不上，请换网络/VPN，或填自己的 DeepSeek Key';
       showToast(msg, 'error');
     }
     finally { setRewriteBusy(false); }

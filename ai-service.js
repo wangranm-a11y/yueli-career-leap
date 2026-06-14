@@ -7,8 +7,9 @@
   'use strict';
 
   const DEEPSEEK_BASE = 'https://api.deepseek.com/v1';
-  const VERCEL_ORIGIN = 'https://resume-tool-ochre-one.vercel.app';
-  const DEEPSEEK_PROXY = isStaticMirror() ? `${VERCEL_ORIGIN}/api/deepseek` : '/api/deepseek';
+  const DEFAULT_PROXY_ORIGIN = 'https://resume-tool-ochre-one.vercel.app';
+  const PROXY_ORIGIN_STORAGE_KEY = 'yueli_api_proxy_origin_v1';
+  const DEEPSEEK_PROXY_PATH = '/api/deepseek';
   const DEFAULT_MODEL = 'deepseek-v4-pro';  // V4-Pro — much better at creative rewriting
   const PRO_MODEL = 'deepseek-v4-pro';
   let lastParseMeta = {};
@@ -16,6 +17,35 @@
   function isStaticMirror() {
     const host = window.location.hostname;
     return host.endsWith('github.io') || host === 'localhost' || host === '127.0.0.1';
+  }
+
+  function cleanProxyOrigin(value) {
+    const raw = String(value || '').trim().replace(/\/+$/, '');
+    if (!raw) return '';
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== 'https:' && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(raw)) return '';
+      return url.origin;
+    } catch {
+      return '';
+    }
+  }
+
+  function getProxyOrigin() {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = cleanProxyOrigin(params.get('apiProxy'));
+    if (fromQuery) {
+      localStorage.setItem(PROXY_ORIGIN_STORAGE_KEY, fromQuery);
+      return fromQuery;
+    }
+    const saved = cleanProxyOrigin(localStorage.getItem(PROXY_ORIGIN_STORAGE_KEY));
+    if (saved) return saved;
+    return isStaticMirror() ? DEFAULT_PROXY_ORIGIN : '';
+  }
+
+  function getProxyEndpoint() {
+    const origin = getProxyOrigin();
+    return origin ? `${origin}${DEEPSEEK_PROXY_PATH}` : DEEPSEEK_PROXY_PATH;
   }
 
   // ── Prompt Templates ──
@@ -105,7 +135,7 @@
 
     let response;
     try {
-      response = await fetch(apiKey ? `${DEEPSEEK_BASE}/chat/completions` : DEEPSEEK_PROXY, {
+      response = await fetch(apiKey ? `${DEEPSEEK_BASE}/chat/completions` : getProxyEndpoint(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +146,9 @@
       });
     } catch (e) {
       clearTimeout(timeout);
+      if (!apiKey && e.name === 'AbortError') throw new Error('AI_PROXY_TIMEOUT');
       if (e.name === 'AbortError') throw new Error('请求超时（60秒），请检查网络后重试');
+      if (!apiKey) throw new Error('AI_PROXY_UNREACHABLE');
       throw new Error(`网络请求失败: ${e.message}`);
     }
     clearTimeout(timeout);
