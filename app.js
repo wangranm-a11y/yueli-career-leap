@@ -47,6 +47,7 @@
   const SAVE_RECORD_CONSENT_KEY = 'yueli_save_record_consent_v1';
   const CONSENT_VERSION = '2026-06-13-v1';
   const CLIENT_VERSION = '2026-06-13-privacy-analytics';
+  const VERCEL_ORIGIN = 'https://resume-tool-ochre-one.vercel.app';
 
   // ── Safe DOM helpers ──
   function $(s) { return document.querySelector(s); }
@@ -54,6 +55,12 @@
   function on(id, event, fn) {
     const el = typeof id === 'string' ? document.getElementById(id) : id;
     if (el) el.addEventListener(event, fn);
+  }
+  function apiEndpoint(path) {
+    const cleanPath = path.startsWith('/') ? path : '/' + path;
+    const host = window.location.hostname;
+    if (host.endsWith('github.io')) return VERCEL_ORIGIN + cleanPath;
+    return cleanPath;
   }
 
   // ── Utilities ──
@@ -154,7 +161,7 @@
         clientVersion: CLIENT_VERSION
       }, payload)
     };
-    fetch('/api/analytics', {
+    fetch(apiEndpoint('/api/analytics'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -198,7 +205,7 @@
       }
     };
     try {
-      const response = await fetch('/api/resume-records', {
+      const response = await fetch(apiEndpoint('/api/resume-records'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

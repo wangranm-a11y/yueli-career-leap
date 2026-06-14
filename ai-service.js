@@ -7,10 +7,16 @@
   'use strict';
 
   const DEEPSEEK_BASE = 'https://api.deepseek.com/v1';
-  const DEEPSEEK_PROXY = '/api/deepseek';
+  const VERCEL_ORIGIN = 'https://resume-tool-ochre-one.vercel.app';
+  const DEEPSEEK_PROXY = isStaticMirror() ? `${VERCEL_ORIGIN}/api/deepseek` : '/api/deepseek';
   const DEFAULT_MODEL = 'deepseek-v4-pro';  // V4-Pro — much better at creative rewriting
   const PRO_MODEL = 'deepseek-v4-pro';
   let lastParseMeta = {};
+
+  function isStaticMirror() {
+    const host = window.location.hostname;
+    return host.endsWith('github.io') || host === 'localhost' || host === '127.0.0.1';
+  }
 
   // ── Prompt Templates ──
 

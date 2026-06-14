@@ -51,6 +51,13 @@ Then open:
 http://localhost:8788
 ```
 
+## Online Access
+
+- Full app on Vercel: <https://resume-tool-ochre-one.vercel.app>
+- GitHub Pages mirror: <https://wangranm-a11y.github.io/yueli-career-leap/>
+
+The GitHub Pages version is a static mirror for easier viewing and sharing. Because GitHub Pages cannot host private server-side environment variables, AI generation still calls the Vercel serverless API proxy, or the user can provide their own DeepSeek API Key in the browser.
+
 ## Deploy
 
 This project is a static website and can be deployed to Vercel, Netlify, GitHub Pages, or any static hosting service.
