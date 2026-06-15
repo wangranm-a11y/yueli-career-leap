@@ -775,6 +775,13 @@ textarea, input { font-family: inherit; }
   z-index: 99;
 }
 .et-lang-tabs { display: flex; gap: 2px; }
+.resume-mode-tabs {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  background: #ece8df;
+  padding: 2px;
+}
 .et-tab {
   padding: 5px 14px;
   border: none;
@@ -787,6 +794,19 @@ textarea, input { font-family: inherit; }
 }
 .et-tab:hover { color: var(--text); }
 .et-tab.active { background: var(--bg-warm); color: var(--text); font-weight: 600; }
+.resume-mode-tab {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.resume-mode-tab.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+}
 .et-spacer { flex: 1; }
 
 .btn-sm {
@@ -985,8 +1005,10 @@ textarea, input { font-family: inherit; }
   padding: 20px;
   background: #e0dcd3;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 18px;
+  justify-content: flex-start;
+  align-items: center;
 }
 .preview-a4-page {
   --resume-fit-scale: 1;
@@ -1005,6 +1027,17 @@ textarea, input { font-family: inherit; }
   line-height: 1.48;
   color: #1a1a1a;
   box-sizing: border-box;
+  flex: 0 0 auto;
+  position: relative;
+}
+.preview-a4-page::after {
+  content: attr(data-page-no);
+  position: absolute;
+  right: -28px;
+  bottom: 8px;
+  color: rgba(0,0,0,0.32);
+  font-size: 12px;
+  font-weight: 700;
 }
 .pdf-export-stage {
   position: fixed;
@@ -1014,6 +1047,18 @@ textarea, input { font-family: inherit; }
   height: var(--a4-height);
   pointer-events: none;
   overflow: hidden;
+  z-index: -1;
+  background: #fff;
+}
+.pdf-preview-build-stage {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: var(--a4-width);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  pointer-events: none;
   z-index: -1;
   background: #fff;
 }

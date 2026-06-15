@@ -28,6 +28,9 @@
     experienceSelectionSignature: '',
     resumeZH: null,
     resumeEN: null,
+    compactResumeZH: null,
+    compactResumeEN: null,
+    resumeMode: 'full',
     currentView: 'input',
     currentLang: 'zh',
     theme: 'professional',
@@ -722,8 +725,12 @@
     return !!(
       state.resumeZH ||
       state.resumeEN ||
+      state.compactResumeZH ||
+      state.compactResumeEN ||
       (state.editorHTML.zh && !state.editorHTML.zh.includes('resume-empty-state')) ||
-      (state.editorHTML.en && !state.editorHTML.en.includes('resume-empty-state'))
+      (state.editorHTML.en && !state.editorHTML.en.includes('resume-empty-state')) ||
+      (state.editorHTML.onepage_zh && !state.editorHTML.onepage_zh.includes('resume-empty-state')) ||
+      (state.editorHTML.onepage_en && !state.editorHTML.onepage_en.includes('resume-empty-state'))
     );
   }
 
@@ -745,6 +752,9 @@
       localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify({
         resumeZH: state.resumeZH,
         resumeEN: state.resumeEN,
+        compactResumeZH: state.compactResumeZH,
+        compactResumeEN: state.compactResumeEN,
+        resumeMode: state.resumeMode,
         editorHTML: state.editorHTML,
         effectiveJD: state.effectiveJD,
         jdTitle: state.jdTitle,
@@ -771,13 +781,18 @@
       if (!raw) return false;
       const saved = JSON.parse(raw);
       const editorHTML = saved.editorHTML || {};
-      const hasSavedResume = !!(saved.resumeZH || saved.resumeEN || editorHTML.zh || editorHTML.en);
+      const hasSavedResume = !!(saved.resumeZH || saved.resumeEN || saved.compactResumeZH || saved.compactResumeEN || editorHTML.zh || editorHTML.en || editorHTML.onepage_zh || editorHTML.onepage_en);
       if (!hasSavedResume) return false;
       state.resumeZH = saved.resumeZH || null;
       state.resumeEN = saved.resumeEN || null;
+      state.compactResumeZH = saved.compactResumeZH || null;
+      state.compactResumeEN = saved.compactResumeEN || null;
+      state.resumeMode = saved.resumeMode === 'onepage' ? 'onepage' : 'full';
       state.editorHTML = {
         zh: editorHTML.zh && !editorHTML.zh.includes('resume-empty-state') ? editorHTML.zh : '',
-        en: editorHTML.en && !editorHTML.en.includes('resume-empty-state') ? editorHTML.en : ''
+        en: editorHTML.en && !editorHTML.en.includes('resume-empty-state') ? editorHTML.en : '',
+        onepage_zh: editorHTML.onepage_zh && !editorHTML.onepage_zh.includes('resume-empty-state') ? editorHTML.onepage_zh : '',
+        onepage_en: editorHTML.onepage_en && !editorHTML.onepage_en.includes('resume-empty-state') ? editorHTML.onepage_en : ''
       };
       state.effectiveJD = saved.effectiveJD || '';
       state.jdTitle = saved.jdTitle || '';
@@ -1047,16 +1062,40 @@
   function getCurrentResumeText() {
     const editor = document.getElementById('editorArea');
     if (editor && editor.innerText.trim()) return editor.innerText.trim();
-    const content = state.currentLang === 'zh' ? state.resumeZH : state.resumeEN;
+    const content = getActiveResumeContent();
     return content ? JSON.stringify(content) : '';
   }
 
   function clearEditorDrafts() {
-    state.editorHTML = { zh: '', en: '' };
+    state.editorHTML = { zh: '', en: '', onepage_zh: '', onepage_en: '' };
   }
 
   function getLangKey() {
-    return state.currentLang === 'en' ? 'en' : 'zh';
+    const lang = state.currentLang === 'en' ? 'en' : 'zh';
+    return state.resumeMode === 'onepage' ? 'onepage_' + lang : lang;
+  }
+
+  function getActiveResumeContent() {
+    if (state.resumeMode === 'onepage') {
+      return state.currentLang === 'en' ? state.compactResumeEN : state.compactResumeZH;
+    }
+    return state.currentLang === 'en' ? state.resumeEN : state.resumeZH;
+  }
+
+  function setResumeMode(mode) {
+    saveCurrentEditorDraft();
+    state.resumeMode = mode === 'onepage' ? 'onepage' : 'full';
+    updateResumeModeTabs();
+    renderEditor();
+    renderPreview();
+    checkPageFill();
+    persistResumeState();
+  }
+
+  function updateResumeModeTabs() {
+    $$('.resume-mode-tab').forEach(t => t.classList.toggle('active', t.dataset.resumeMode === state.resumeMode));
+    const makeBtn = document.getElementById('makeOnePageBtn');
+    if (makeBtn) makeBtn.textContent = state.compactResumeZH || state.compactResumeEN ? '更新一页版' : '生成一页版';
   }
 
   function getResumeLabels() {
@@ -1242,11 +1281,16 @@
     on('themeSelect2', 'change', e => { state.theme = e.target.value; savePrefs(); renderPreview(); });
     on('downloadBtn', 'click', handleDownload);
     on('downloadBtn2', 'click', handleDownload);
+    on('makeOnePageBtn', 'click', handleMakeOnePage);
     on('saveRecordConsent', 'change', savePrivacyOptions);
     on('viewTabs', 'click', e => { if (e.target.classList.contains('tb-tab')) switchView(e.target.dataset.view); });
     document.addEventListener('click', e => {
       if (e.target && e.target.id === 'emptyBackToInput') switchView('input');
+      if (e.target && e.target.id === 'emptyMakeOnePage') handleMakeOnePage();
       if (e.target && e.target.id === 'feedbackModal') closeFeedbackModal();
+    });
+    document.querySelector('.resume-mode-tabs')?.addEventListener('click', e => {
+      if (e.target.classList.contains('resume-mode-tab')) setResumeMode(e.target.dataset.resumeMode);
     });
     const langTabs = document.querySelector('.et-lang-tabs');
     if (langTabs) langTabs.addEventListener('click', e => { if (e.target.classList.contains('et-tab')) switchLanguage(e.target.dataset.lang); });
@@ -1595,22 +1639,13 @@
       if (!state.resumeZH) throw new Error('AI 返回内容不完整，请重试一次或减少英文/无关素材。');
       setGenerateProgress(82, '正在排版到 A4 预览…', false, '排版中…');
       clearEditorDrafts();
+      state.compactResumeZH = null;
+      state.compactResumeEN = null;
+      state.resumeMode = 'full';
       switchView('edit');
       renderEditor(); renderPreview();
-      setGenerateProgress(88, '正在把内容自动铺满 A4，一杯咖啡的最后几口。', false, '压实 A4…');
-      startAutoFillProgressLoop();
-      const fill = checkPageFill();
-      if (fill.needsFill) {
-        await autoFillToFit(6, { silent: true, targetPct: PAGE_FILL_TARGET });
-      }
-      let finalFill = checkPageFill();
-      if (finalFill.needsFill || finalFill.pct < PAGE_FILL_TARGET) {
-        applyUnderfillFallback('generate_final_guard');
-        finalFill = checkPageFill();
-      }
-      if (finalFill.needsFill || finalFill.pct < PAGE_FILL_TARGET_AFTER_AUTOFILL) {
-        showToast('内容仍偏少，已自动打开兜底板块；建议补充更多原始经历可继续压满页面', 'warning');
-      }
+      updateResumeModeTabs();
+      checkPageFill();
       stopGenerateProgressLoop();
       saveSnapshot(state.jdTitle ? '岗位: ' + state.jdTitle : '初始生成');
       persistResumeState();
@@ -1627,7 +1662,7 @@
         durationMs: Date.now() - generateStartedAt
       });
       await saveResumeRecord('generate_success');
-      setGenerateProgress(100, '生成完成，已默认整理成一页 A4。', false, '生成完成');
+      setGenerateProgress(100, '生成完成。完整版会自动分页，不会裁切；需要一页版可点上方“生成一页版”。', false, '生成完成');
       setTimeout(() => setGenerateProgress(0, ''), 700);
       showToast('简历生成完成！', 'success');
     } catch (err) {
@@ -1781,17 +1816,18 @@
 
   // ── Rendering (left editor + right preview) ──
   function renderEditor() {
-    let content = state.currentLang === 'zh' ? state.resumeZH : state.resumeEN;
+    let content = getActiveResumeContent();
     const el = document.getElementById('editorArea');
     if (!el) return;
     const draft = state.editorHTML[getLangKey()];
     if (draft) { el.innerHTML = draft; return; }
     if (!content) {
+      const isOnePage = state.resumeMode === 'onepage';
       el.innerHTML = [
         '<div class="resume-empty-state">',
-        '<strong>' + (state.currentLang === 'en' ? 'English version is not ready yet' : '还没有生成简历') + '</strong>',
-        '<p>' + (state.currentLang === 'en' ? 'Click English again after the Chinese resume is generated; Career Leap will create a pure-text English version.' : '先回到输入页填写目标岗位和经历素材，生成成功后这里会显示可编辑内容。') + '</p>',
-        '<button type="button" class="btn-sm btn-sm-primary" id="emptyBackToInput">回到输入页</button>',
+        '<strong>' + (isOnePage ? '还没有一页精简版' : (state.currentLang === 'en' ? 'English version is not ready yet' : '还没有生成简历')) + '</strong>',
+        '<p>' + (isOnePage ? '点击上方“生成一页版”，会单独生成可预览的一页精简版本；完整版不会被裁切。' : (state.currentLang === 'en' ? 'Click English again after the Chinese resume is generated; Career Leap will create a pure-text English version.' : '先回到输入页填写目标岗位和经历素材，生成成功后这里会显示可编辑内容。')) + '</p>',
+        isOnePage ? '<button type="button" class="btn-sm btn-sm-primary" id="emptyMakeOnePage">生成一页版</button>' : '<button type="button" class="btn-sm btn-sm-primary" id="emptyBackToInput">回到输入页</button>',
         '</div>'
       ].join('');
       return;
@@ -1995,16 +2031,71 @@
 
   function renderPreview() {
     const editorEl = document.getElementById('editorArea');
-    const previewEl = document.getElementById('previewA4');
-    if (!previewEl) return;
-    previewEl.classList.remove('theme-professional', 'theme-modern', 'theme-creative');
-    previewEl.classList.add('theme-' + (state.theme || 'professional'));
+    const container = document.getElementById('previewContainer');
+    if (!container) return;
     if (!editorEl || !editorEl.innerHTML.trim() || editorEl.querySelector('.resume-empty-state')) {
-      previewEl.innerHTML = '<div class="resume-empty-state resume-empty-state--preview"><strong>等待生成</strong><p>生成完成后会在这里预览一页 A4 简历。</p></div>';
+      container.innerHTML = '';
+      const empty = createPreviewPage();
+      empty.id = 'previewA4';
+      empty.innerHTML = '<div class="resume-empty-state resume-empty-state--preview"><strong>等待生成</strong><p>生成完成后会在这里预览 A4 简历；内容多时会自动分页。</p></div>';
+      container.appendChild(empty);
       return;
     }
-    previewEl.innerHTML = editorEl.innerHTML;
-    fitPreviewToSinglePage();
+    renderPreviewPagesFromHTML(editorEl.innerHTML);
+  }
+
+  function createPreviewPage() {
+    const page = document.createElement('div');
+    page.className = 'preview-a4-page theme-' + (state.theme || 'professional');
+    resetPreviewFit(page);
+    return page;
+  }
+
+  function getPreviewPages() {
+    return Array.from(document.querySelectorAll('#previewContainer .preview-a4-page'));
+  }
+
+  function renderPreviewPagesFromHTML(html, targetContainer) {
+    const container = targetContainer || document.getElementById('previewContainer');
+    if (!container) return [];
+    container.innerHTML = '';
+    const source = document.createElement('div');
+    source.innerHTML = html;
+    const nodes = Array.from(source.children);
+    if (!nodes.length) {
+      const page = createPreviewPage();
+      page.id = 'previewA4';
+      container.appendChild(page);
+      return [page];
+    }
+
+    const pages = [];
+    let page = createPreviewPage();
+    page.id = 'previewA4';
+    container.appendChild(page);
+    pages.push(page);
+
+    nodes.forEach(node => {
+      const clone = node.cloneNode(true);
+      page.appendChild(clone);
+      resetPreviewFit(page);
+      const overflow = getPreviewContentMetrics(page).contentHeight > page.clientHeight;
+      if (overflow && page.children.length > 1) {
+        page.removeChild(clone);
+        page = createPreviewPage();
+        container.appendChild(page);
+        pages.push(page);
+        page.appendChild(clone);
+      }
+    });
+
+    pages.forEach((p, idx) => {
+      p.id = idx === 0 ? 'previewA4' : '';
+      p.dataset.pageNo = String(idx + 1);
+      p.classList.remove('theme-professional', 'theme-modern', 'theme-creative');
+      p.classList.add('theme-' + (state.theme || 'professional'));
+    });
+    return pages;
   }
 
   function resetPreviewFit(preview) {
@@ -2064,6 +2155,11 @@
     const preview = document.getElementById('previewA4');
     const prompt = document.getElementById('fillPrompt');
     if (!preview || !prompt) return { pct: 100, needsFill: false };
+    const pages = getPreviewPages();
+    if (state.resumeMode !== 'onepage' || pages.length > 1) {
+      prompt.style.display = 'none';
+      return { pct: 100, needsFill: false, isOverflow: false, scale: 1, pages: pages.length || 1 };
+    }
     const fit = fitPreviewToSinglePage();
     const pct = Math.min(150, Math.round(fit.pct));
     prompt.style.display = 'none';
@@ -2121,7 +2217,72 @@
     if (!checkPageFill().needsFill) showToast('补充完成', 'success');
   }
 
+  async function handleMakeOnePage() {
+    if (!AIService.hasApiKey()) { openAPIKeyModal(); return; }
+    if (!state.resumeZH && !state.resumeEN) { showToast('请先生成完整版简历', 'warning'); return; }
+    saveCurrentEditorDraft();
+    const btn = document.getElementById('makeOnePageBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '生成中…'; }
+    setGenerateProgress(18, '正在另做一份一页精简版：会删繁就简，但不再裁切完整版。', false, '压缩一页…');
+    try {
+      startAutoFillProgressLoop();
+      const result = await AIService.generateResume({
+        jd: state.effectiveJD || state.jd || (state.jdTitle ? '目标岗位：' + state.jdTitle : ''),
+        experiences: buildSelectedExperienceContext(),
+        requirements: [
+          state.requirements || '',
+          '请基于当前完整版简历生成“单独的一页精简版”。这是可选版本，不要覆盖完整版。',
+          '目标：尽量刚好一页 A4，但绝不能靠极小字号或裁切实现；如果内容过多，优先保留教育、最相关且最近的实习/项目经历，删减次要 bullet 和兜底板块。',
+          '每段经历保留 2-3 条高质量 STAR bullet；每条中文 bullet 60-85 个汉字，事实优先，不编造公司、时间、奖项和数据。',
+          '技能和个人概述只有在版面不足时才保留；如果经历充足，可以删除。',
+          '当前完整版内容如下：\n' + getCurrentResumeText()
+        ].filter(Boolean).join('\n\n')
+      });
+      state.compactResumeZH = normalizeResume(result.zh || result.raw || result) || state.compactResumeZH || state.resumeZH;
+      if (result.en) state.compactResumeEN = normalizeResume(result.en) || state.compactResumeEN;
+      state.resumeMode = 'onepage';
+      state.editorHTML.onepage_zh = '';
+      state.editorHTML.onepage_en = '';
+      renderEditor();
+      renderPreview();
+      const pages = getPreviewPages();
+      if (pages.length > 1) {
+        showToast('一页版仍超过 1 页，已保留完整分页预览，避免裁切；可以继续让 AI 精简。', 'warning');
+      } else {
+        showToast('一页精简版已生成，可以先预览再导出', 'success');
+      }
+      updateResumeModeTabs();
+      saveSnapshot('一页精简版');
+      persistResumeState();
+      setGenerateProgress(100, '一页精简版生成完成。先看右侧预览，满意后再导出。', false, '完成');
+      setTimeout(() => setGenerateProgress(0, ''), 700);
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || '一页版生成失败', 'error');
+      setGenerateProgress(0, '<span style="color:#c7512e;">一页版生成失败，请稍后重试。</span>', true);
+    } finally {
+      stopGenerateProgressLoop();
+      if (btn) { btn.disabled = false; btn.textContent = state.compactResumeZH || state.compactResumeEN ? '更新一页版' : '生成一页版'; }
+    }
+  }
+
   async function ensureEnglishResume() {
+    if (state.resumeMode === 'onepage') {
+      if (state.compactResumeEN) return true;
+      if (!state.compactResumeZH) {
+        showToast('请先生成一页精简版', 'warning');
+        return false;
+      }
+      showToast('正在生成英文一页版，约 20 秒…', 'info');
+      const compactResult = await AIService.translateResume({
+        zhResume: state.compactResumeZH,
+        jd: state.effectiveJD || state.jd || state.jdTitle || ''
+      });
+      state.compactResumeEN = normalizeResume(compactResult.en || compactResult);
+      state.editorHTML.onepage_en = '';
+      persistResumeState();
+      return !!state.compactResumeEN;
+    }
     if (state.resumeEN) return true;
     if (!state.resumeZH) {
       showToast('请先生成中文简历', 'warning');
@@ -2150,30 +2311,58 @@
     return [];
   }
 
+  function chooseDownloadVersion() {
+    const currentDefault = state.resumeMode === 'onepage' ? '2' : '1';
+    const choice = window.prompt(
+      '请选择导出版本：\n1 = 完整版 PDF（自动分页，不裁切）\n2 = 一页精简版 PDF（先生成/预览再导出）\n3 = 编辑区完整版 PDF（导出左侧你手动编辑后的内容）',
+      currentDefault
+    );
+    if (choice === null) return '';
+    const normalized = String(choice).trim().toLowerCase();
+    if (['1', '完整版', 'full'].includes(normalized)) return 'full';
+    if (['2', '一页', '一页版', 'onepage', 'compact'].includes(normalized)) return 'onepage';
+    if (['3', '编辑区', 'editor', 'edit'].includes(normalized)) return 'editor';
+    showToast('没有识别导出版本，已取消', 'warning');
+    return '';
+  }
+
   // ── Download ──
   async function handleDownload() {
     saveCurrentEditorDraft();
     if (!hasResumeContent()) { showToast('请先生成简历', 'warning'); return; }
+    const version = chooseDownloadVersion();
+    if (!version) return;
+    if (version === 'onepage' && !state.compactResumeZH && !state.compactResumeEN && !state.editorHTML.onepage_zh && !state.editorHTML.onepage_en) {
+      showToast('请先点击“生成一页版”，预览确认后再导出', 'warning');
+      setResumeMode('onepage');
+      return;
+    }
     const langs = chooseDownloadLanguages();
     if (!langs.length) return;
     const btns = [document.getElementById('downloadBtn'), document.getElementById('downloadBtn2')].filter(Boolean);
     btns.forEach(b => { b.textContent = '导出中…'; b.disabled = true; });
     const originalLang = state.currentLang;
+    const originalMode = state.resumeMode;
     try {
       for (const lang of langs) {
-        if (lang === 'en') {
+        if (lang === 'en' && version !== 'editor') {
+          state.resumeMode = version === 'onepage' ? 'onepage' : 'full';
           const ready = await ensureEnglishResume();
           if (!ready) continue;
         }
-        await exportResumePDF(lang);
+        if (version === 'editor') await exportEditorPDF(lang);
+        else await exportResumePDF(lang, version);
       }
       trackEvent('export_pdf', {
         languages: langs,
+        version,
         hasPhoto: !!state.photoDataUrl,
         saveRecordConsent: getSaveRecordConsent()
       });
       state.currentLang = originalLang;
+      state.resumeMode = originalMode;
       $$('.et-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === originalLang));
+      updateResumeModeTabs();
       renderEditor(); renderPreview(); checkPageFill();
       showToast(langs.length > 1 ? '中英文 PDF 已下载' : 'PDF 下载完成', 'success');
     } catch (err) {
@@ -2183,63 +2372,32 @@
     finally { btns.forEach(b => { b.textContent = '下载 PDF'; b.disabled = false; }); }
   }
 
-  async function exportResumePDF(lang) {
+  async function exportResumePDF(lang, version) {
     const previousLang = state.currentLang;
-    if (state.currentLang !== lang) {
-      saveCurrentEditorDraft();
-      state.currentLang = lang;
-      $$('.et-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === lang));
-      renderEditor(); renderPreview(); checkPageFill();
-      await new Promise(r => setTimeout(r, 80));
-    }
-    const preview = document.getElementById('previewA4');
-    if (!preview || !preview.textContent.trim() || preview.querySelector('.resume-empty-state')) {
-      throw new Error('EMPTY_PREVIEW');
-    }
+    const previousMode = state.resumeMode;
+    state.resumeMode = version === 'onepage' ? 'onepage' : 'full';
     try {
+      if (state.currentLang !== lang) {
+        saveCurrentEditorDraft();
+        state.currentLang = lang;
+        $$('.et-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === lang));
+      }
+      renderEditor();
+      renderPreview();
+      checkPageFill();
+      await new Promise(r => setTimeout(r, 120));
+      const pages = getPreviewPages();
+      if (!pages.length || pages[0].querySelector('.resume-empty-state')) {
+        throw new Error('EMPTY_PREVIEW');
+      }
+      if (version === 'onepage' && pages.length > 1) {
+        showToast('一页版预览超过 1 页，已按多页导出以避免裁切', 'warning');
+      }
       await document.fonts?.ready;
-      const fit = fitPreviewToSinglePage();
-      if (fit.isOverflow) {
-        showToast('内容偏多，已自动压缩字号和间距以避免导出裁切', 'info');
-      }
-      const exportNode = createPdfExportNode(preview);
-      const pageCssWidth = ResumeRenderer.A4_WIDTH;
-      const pageCssHeight = ResumeRenderer.A4_HEIGHT;
-      document.body.appendChild(exportNode.stage);
-      try {
-        const canvas = await html2canvas(exportNode.page, {
-          width: pageCssWidth,
-          height: pageCssHeight,
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          scrollX: 0,
-          scrollY: 0,
-          windowWidth: pageCssWidth,
-          windowHeight: pageCssHeight
-        });
-        const jsPDF = window.jspdf?.jsPDF;
-        if (jsPDF) {
-          const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const pageHeight = pdf.internal.pageSize.getHeight();
-          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight);
-          addPdfLinks(pdf, exportNode.page, pageWidth, pageHeight);
-          pdf.save(lang === 'en' ? 'resume-en.pdf' : 'resume-zh.pdf');
-        } else {
-          const a = document.createElement('a');
-          a.href = canvas.toDataURL('image/png');
-          a.download = lang === 'en' ? 'resume-en.png' : 'resume-zh.png';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          showToast('PDF 组件未加载，已降级导出 PNG', 'warning');
-        }
-      } finally {
-        exportNode.stage.remove();
-      }
+      await exportPagesToPDF(pages, lang, version === 'onepage' ? 'onepage' : 'full');
     } finally {
       state.currentLang = previousLang;
+      state.resumeMode = previousMode;
     }
   }
 
@@ -2268,6 +2426,71 @@
 
     stage.appendChild(page);
     return { stage, page };
+  }
+
+  async function exportPagesToPDF(pages, lang, versionName) {
+    const jsPDF = window.jspdf?.jsPDF;
+    if (!jsPDF) throw new Error('PDF 组件未加载');
+    const pageCssWidth = ResumeRenderer.A4_WIDTH;
+    const pageCssHeight = ResumeRenderer.A4_HEIGHT;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    for (let i = 0; i < pages.length; i++) {
+      const exportNode = createPdfExportNode(pages[i]);
+      document.body.appendChild(exportNode.stage);
+      try {
+        const canvas = await html2canvas(exportNode.page, {
+          width: pageCssWidth,
+          height: pageCssHeight,
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: pageCssWidth,
+          windowHeight: pageCssHeight
+        });
+        if (i > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight);
+        addPdfLinks(pdf, exportNode.page, pageWidth, pageHeight);
+      } finally {
+        exportNode.stage.remove();
+      }
+    }
+    const langPart = lang === 'en' ? 'en' : 'zh';
+    pdf.save('resume-' + langPart + '-' + versionName + '.pdf');
+  }
+
+  async function exportEditorPDF(lang) {
+    const previousLang = state.currentLang;
+    try {
+      if (state.currentLang !== lang) {
+        if (lang === 'en') {
+          const ready = await ensureEnglishResume();
+          if (!ready) throw new Error('EN_NOT_READY');
+        }
+        saveCurrentEditorDraft();
+        state.currentLang = lang;
+        $$('.et-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === lang));
+        renderEditor();
+        await new Promise(r => setTimeout(r, 120));
+      }
+      const editor = document.getElementById('editorArea');
+      if (!editor || !editor.innerText.trim() || editor.querySelector('.resume-empty-state')) throw new Error('EMPTY_EDITOR');
+      const stage = document.createElement('div');
+      stage.className = 'pdf-preview-build-stage';
+      document.body.appendChild(stage);
+      try {
+        const pages = renderPreviewPagesFromHTML(editor.innerHTML, stage);
+        await document.fonts?.ready;
+        await exportPagesToPDF(pages, lang, 'editor-full');
+      } finally {
+        stage.remove();
+      }
+    } finally {
+      state.currentLang = previousLang;
+    }
   }
 
   function addPdfLinks(pdf, preview, pageWidth, pageHeight) {
@@ -2572,6 +2795,9 @@
     state.versions.push({
       zh: state.resumeZH ? JSON.parse(JSON.stringify(state.resumeZH)) : null,
       en: state.resumeEN ? JSON.parse(JSON.stringify(state.resumeEN)) : null,
+      compactZh: state.compactResumeZH ? JSON.parse(JSON.stringify(state.compactResumeZH)) : null,
+      compactEn: state.compactResumeEN ? JSON.parse(JSON.stringify(state.compactResumeEN)) : null,
+      resumeMode: state.resumeMode,
       editorHTML: JSON.parse(JSON.stringify(state.editorHTML)),
       effectiveJD: state.effectiveJD,
       time: new Date().toISOString(),
@@ -2597,10 +2823,14 @@
     const v = state.versions[idx]; if (!v) return;
     state.resumeZH = v.zh ? JSON.parse(JSON.stringify(v.zh)) : null;
     state.resumeEN = v.en ? JSON.parse(JSON.stringify(v.en)) : null;
-    state.editorHTML = v.editorHTML ? JSON.parse(JSON.stringify(v.editorHTML)) : { zh: '', en: '' };
+    state.compactResumeZH = v.compactZh ? JSON.parse(JSON.stringify(v.compactZh)) : null;
+    state.compactResumeEN = v.compactEn ? JSON.parse(JSON.stringify(v.compactEn)) : null;
+    state.resumeMode = v.resumeMode === 'onepage' ? 'onepage' : 'full';
+    state.editorHTML = v.editorHTML ? JSON.parse(JSON.stringify(v.editorHTML)) : { zh: '', en: '', onepage_zh: '', onepage_en: '' };
     state.effectiveJD = v.effectiveJD || state.effectiveJD;
     state.currentVersionIdx = idx;
     persistResumeState();
+    updateResumeModeTabs();
     renderEditor(); renderPreview(); checkPageFill(); renderHistory();
     showToast('已恢复', 'success');
   }
@@ -2647,7 +2877,7 @@
     document.getElementById('viewTabs').style.display = inResultViews ? '' : 'none';
     document.getElementById('downloadBtn').style.display = inResultViews ? '' : 'none';
     document.getElementById('themeSelect').style.display = 'none';
-    if (view === 'edit') { renderEditor(); renderPreview(); checkPageFill(); }
+    if (view === 'edit') { updateResumeModeTabs(); renderEditor(); renderPreview(); checkPageFill(); }
     else if (view === 'score') renderScore();
     else if (view === 'history') renderHistory();
   }
