@@ -593,6 +593,100 @@ textarea, input { font-family: inherit; }
 }
 .file-tag .file-remove:hover { color: var(--accent); }
 
+.experience-picker {
+  margin-top: 14px;
+  border: 1px solid rgba(14,18,14,0.16);
+  background: rgba(255,255,255,0.48);
+}
+.experience-picker-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid rgba(14,18,14,0.12);
+}
+.experience-picker-head strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 3px;
+}
+.experience-picker-head span,
+.experience-picker-summary {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.experience-picker-summary {
+  padding: 10px 14px 0;
+}
+.experience-option-list {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px 14px;
+}
+.experience-option {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid rgba(14,18,14,0.14);
+  background: rgba(248,247,242,0.82);
+}
+.experience-option input {
+  margin-top: 4px;
+  accent-color: var(--ink);
+}
+.experience-option-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+.experience-option-meta {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.experience-option-reason {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.experience-option-badge {
+  border: 1px solid rgba(14,18,14,0.16);
+  padding: 2px 7px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.experience-option.is-recommended .experience-option-badge {
+  color: #185c4b;
+  border-color: rgba(24,92,75,0.28);
+  background: rgba(183,239,226,0.24);
+}
+.experience-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid rgba(14,18,14,0.12);
+}
+@media (max-width: 720px) {
+  .experience-picker-head,
+  .experience-picker-actions {
+    display: grid;
+  }
+  .experience-option {
+    grid-template-columns: 18px 1fr;
+  }
+  .experience-option-badge {
+    grid-column: 2;
+    justify-self: flex-start;
+  }
+}
+
 /* Generate */
 .generate-area { text-align: center; margin-top: 8px; }
 .privacy-options {

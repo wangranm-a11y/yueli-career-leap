@@ -580,6 +580,44 @@
       return result;
     },
 
+    async extractExperienceOptions({ jd, experiences, requirements = '' }) {
+      const result = await callDeepSeek({
+        model: DEFAULT_MODEL,
+        systemPrompt: `你是简历内容策划助手。任务：从用户提供的原始经历素材中，拆出可以写进简历的不同经历选项，并推荐一组最适合目标岗位的一页 A4 组合。
+
+规则：
+1. 只做经历拆分和推荐，不写完整简历。
+2. 不编造公司、项目、时间、奖项、数据、链接。
+3. 有公司/机构/岗位/实习生/Intern/工作痕迹的，category 必须是 internship 或 work，不要归成 project。
+4. 课程项目、比赛、side project、作品集归 project；创业、社团、校园活动归 campus 或 entrepreneurship。
+5. 每个选项都要保留 sourceEvidence：从原始素材中提炼出的事实依据，方便后续生成使用。
+6. 推荐组合要兼顾：目标岗位相关性、时间新近、经历丰富度、一页 A4 密度。不要只推荐 1-2 个经历，素材足够时推荐 4-7 个。
+7. 返回 JSON only，不要 Markdown。
+
+Schema:
+{
+  "strategy": "一句话说明推荐组合逻辑",
+  "options": [
+    {
+      "id": "exp_1",
+      "title": "公司/项目/组织名称",
+      "role": "岗位或角色",
+      "category": "internship|work|project|campus|entrepreneurship|education|other",
+      "duration": "原文时间，没有则空",
+      "relevance": 1-5,
+      "recommended": true,
+      "reason": "为什么建议写/不写",
+      "sourceEvidence": "事实依据摘要，不超过220字"
+    }
+  ]
+}`,
+        userMessage: `## 目标岗位/JD\n${jd}\n\n## 用户特殊要求\n${requirements}\n\n## 原始经历素材\n${experiences}`,
+        temperature: 0.25,
+        maxTokens: 6000
+      });
+      return result;
+    },
+
     // ── Rewrite Section ──
     async rewriteSection({ selectedText, instruction, fullContext }) {
       const result = await callDeepSeek({

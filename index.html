@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=50">
+  <link rel="stylesheet" href="styles.css?v=51">
 </head>
 <body>
 
@@ -230,6 +230,21 @@
           placeholder="或者直接在这里打字描述你的经历…&#10;&#10;例如：&#10;2023.6-2024.3 在XX公司做电商运营实习，主要负责…"
           rows="8"
         ></textarea>
+        <div class="experience-picker" id="experiencePicker" style="display:none">
+          <div class="experience-picker-head">
+            <div>
+              <strong>生成前先确认经历组合</strong>
+              <span>AI 会先从素材里拆出可写进简历的经历，你可以勾选想保留的项目。</span>
+            </div>
+            <button class="btn-sm" id="reanalyzeExperiencesBtn" type="button">重新分析</button>
+          </div>
+          <div class="experience-picker-summary" id="experiencePickerSummary"></div>
+          <div class="experience-option-list" id="experienceOptionList"></div>
+          <div class="experience-picker-actions">
+            <button class="btn-sm" id="selectRecommendedBtn" type="button">恢复推荐组合</button>
+            <button class="btn-sm btn-sm-primary" id="confirmExperienceSelectionBtn" type="button">用勾选经历生成</button>
+          </div>
+        </div>
         <div class="input-card-footer">
           <span id="charCount" class="char-count">0 字</span>
           <button class="btn-text" id="clearExp">清空</button>
@@ -361,8 +376,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="ai-service.js?v=50"></script>
-  <script src="resume-renderer.js?v=50"></script>
-  <script src="app.js?v=50"></script>
+  <script src="ai-service.js?v=51"></script>
+  <script src="resume-renderer.js?v=51"></script>
+  <script src="app.js?v=51"></script>
 </body>
 </html>

@@ -22,6 +22,10 @@
     requirements: '',
     portfolioLinks: [],
     uploadedFiles: [],
+    experienceOptions: [],
+    selectedExperienceIds: [],
+    experienceSelectionConfirmed: false,
+    experienceSelectionSignature: '',
     resumeZH: null,
     resumeEN: null,
     currentView: 'input',
@@ -180,6 +184,15 @@
       experiences: state.experiences,
       requirements: state.requirements,
       portfolioLinks: state.portfolioLinks,
+      selectedExperiences: state.experienceOptions
+        .filter(item => new Set(state.selectedExperienceIds).has(item.id))
+        .map(item => ({
+          title: item.title,
+          role: item.role,
+          category: item.category,
+          duration: item.duration,
+          relevance: item.relevance
+        })),
       uploadedFiles: state.uploadedFiles.map(file => ({
         name: file.name,
         type: file.type || '',
@@ -849,8 +862,18 @@
       expEl.value = combined;
       state.experiences = combined;
     }
+    resetExperienceSelection();
     renderFileList();
     updateCharCount();
+  }
+
+  function resetExperienceSelection() {
+    state.experienceOptions = [];
+    state.selectedExperienceIds = [];
+    state.experienceSelectionConfirmed = false;
+    state.experienceSelectionSignature = '';
+    const picker = document.getElementById('experiencePicker');
+    if (picker) picker.style.display = 'none';
   }
 
   function renderFileList() {
@@ -878,6 +901,147 @@
     if (!el) return;
     const n = state.jd.length;
     el.textContent = n ? n + ' 字' : '';
+  }
+
+  function getExperienceSelectionSignature() {
+    return [
+      state.jdMode,
+      state.jdTitle,
+      state.jd,
+      state.experiences,
+      state.requirements
+    ].join('\n---\n').slice(0, 60000);
+  }
+
+  function normalizeExperienceOptions(raw) {
+    const options = asArray(raw?.options || raw?.experiences || raw?.items).map((item, idx) => {
+      const id = String(item.id || 'exp_' + (idx + 1));
+      const title = pick(item, ['title', 'name', 'company', 'project', 'organization', '项目', '公司']) || '未命名经历';
+      const role = pick(item, ['role', 'position', 'titleRole', '职责', '角色', '岗位']) || '';
+      const category = String(pick(item, ['category', 'type', '类别']) || 'other').toLowerCase();
+      const duration = pick(item, ['duration', 'time', 'date', '时间']) || '';
+      const relevance = Math.max(1, Math.min(5, Number(item.relevance || item.score || 3)));
+      return {
+        id,
+        title: String(title).slice(0, 80),
+        role: String(role).slice(0, 80),
+        category,
+        duration: String(duration).slice(0, 60),
+        relevance,
+        recommended: item.recommended !== false && (item.recommended === true || relevance >= 3 || idx < 5),
+        reason: String(item.reason || item.recommendReason || '').slice(0, 180),
+        sourceEvidence: String(item.sourceEvidence || item.evidence || item.summary || '').slice(0, 260)
+      };
+    }).filter(item => item.title || item.sourceEvidence);
+    if (!options.some(item => item.recommended)) {
+      options.slice(0, Math.min(5, options.length)).forEach(item => { item.recommended = true; });
+    }
+    return {
+      strategy: String(raw?.strategy || raw?.recommendation || '已按目标岗位相关性、时间新近和一页 A4 密度推荐默认组合。').slice(0, 240),
+      options
+    };
+  }
+
+  function fallbackExperienceOptions(text) {
+    const chunks = String(text || '')
+      .split(/\n(?=(?:20\d{2}|19\d{2}|---|【|#|##|[一二三四五六七八九十]、))/)
+      .map(x => x.trim())
+      .filter(x => x.length >= 24)
+      .slice(0, 10);
+    const options = chunks.map((chunk, idx) => {
+      const firstLine = chunk.split(/\n/).map(x => x.trim()).filter(Boolean)[0] || '';
+      const title = firstLine.replace(/^---|---$/g, '').slice(0, 48) || '经历 ' + (idx + 1);
+      return {
+        id: 'fallback_' + (idx + 1),
+        title,
+        role: '',
+        category: /实习|公司|Intern|运营|产品|市场|咨询/i.test(chunk) ? 'internship' : 'project',
+        duration: inferDurationForItem(title, '', chunk),
+        relevance: idx < 5 ? 4 : 3,
+        recommended: idx < 6,
+        reason: idx < 6 ? '作为默认组合保留，用于保证简历内容密度。' : '可作为补充经历，视版面选择。',
+        sourceEvidence: chunk.slice(0, 220)
+      };
+    });
+    return {
+      strategy: 'AI 分析暂不可用，已按原始素材段落生成一组可调整的经历选项。',
+      options
+    };
+  }
+
+  function renderExperiencePicker() {
+    const picker = document.getElementById('experiencePicker');
+    const list = document.getElementById('experienceOptionList');
+    const summary = document.getElementById('experiencePickerSummary');
+    if (!picker || !list || !summary) return;
+    if (!state.experienceOptions.length) {
+      picker.style.display = 'none';
+      return;
+    }
+    picker.style.display = 'block';
+    const selected = new Set(state.selectedExperienceIds);
+    const recommendedCount = state.experienceOptions.filter(x => x.recommended).length;
+    summary.textContent = '推荐组合：' + recommendedCount + ' 段经历。你可以取消不想写的内容，或勾选补充经历后再生成。';
+    list.innerHTML = state.experienceOptions.map(item => {
+      const meta = [categoryLabel(item.category), item.role, item.duration, '相关度 ' + item.relevance + '/5'].filter(Boolean).join(' / ');
+      return [
+        '<label class="experience-option' + (item.recommended ? ' is-recommended' : '') + '">',
+        '<input type="checkbox" data-exp-option="' + escHTML(item.id) + '"' + (selected.has(item.id) ? ' checked' : '') + '>',
+        '<div>',
+        '<div class="experience-option-title">' + escHTML(item.title) + '</div>',
+        '<div class="experience-option-meta">' + escHTML(meta) + '</div>',
+        '<div class="experience-option-reason">' + escHTML(item.reason || item.sourceEvidence || '可写入简历，用于补充经历厚度。') + '</div>',
+        '</div>',
+        '<span class="experience-option-badge">' + (item.recommended ? '推荐' : '可选') + '</span>',
+        '</label>'
+      ].join('');
+    }).join('');
+    list.querySelectorAll('[data-exp-option]').forEach(input => {
+      input.addEventListener('change', () => {
+        const ids = new Set(state.selectedExperienceIds);
+        if (input.checked) ids.add(input.dataset.expOption);
+        else ids.delete(input.dataset.expOption);
+        state.selectedExperienceIds = Array.from(ids);
+        state.experienceSelectionConfirmed = false;
+      });
+    });
+  }
+
+  function categoryLabel(category) {
+    const map = {
+      internship: '实习',
+      work: '工作',
+      project: '项目',
+      campus: '校园',
+      entrepreneurship: '创业',
+      education: '教育',
+      other: '其他'
+    };
+    return map[category] || category || '其他';
+  }
+
+  function buildSelectedExperienceContext() {
+    const selected = new Set(state.selectedExperienceIds);
+    const pickedOptions = state.experienceOptions.filter(item => selected.has(item.id));
+    if (!pickedOptions.length) return state.experiences;
+    const selectedText = pickedOptions.map((item, idx) => {
+      return [
+        '【选中经历 ' + (idx + 1) + '】',
+        '标题：' + item.title,
+        item.role ? '角色：' + item.role : '',
+        item.duration ? '时间：' + item.duration : '',
+        '类别：' + categoryLabel(item.category),
+        '推荐理由：' + (item.reason || ''),
+        '事实依据：' + (item.sourceEvidence || '')
+      ].filter(Boolean).join('\n');
+    }).join('\n\n');
+    return [
+      '--- 用户已确认本次要写入简历的经历组合，请优先且主要使用这些经历 ---',
+      selectedText,
+      '',
+      '--- 原始完整经历素材，只能作为事实补充和校验，不要优先写未勾选经历，除非为了补满一页且用户未明确排除 ---',
+      state.experiences
+    ].join('\n');
   }
 
   function getCurrentResumeText() {
@@ -1066,6 +1230,13 @@
     on('feedbackFab', 'click', openFeedbackModal);
     on('feedbackCancel', 'click', closeFeedbackModal);
     on('feedbackSubmit', 'click', submitFeedback);
+    on('reanalyzeExperiencesBtn', 'click', () => analyzeExperienceOptions(true));
+    on('selectRecommendedBtn', 'click', () => {
+      state.selectedExperienceIds = state.experienceOptions.filter(item => item.recommended).map(item => item.id);
+      state.experienceSelectionConfirmed = false;
+      renderExperiencePicker();
+    });
+    on('confirmExperienceSelectionBtn', 'click', confirmExperienceSelectionAndGenerate);
     on('generateBtn', 'click', handleGenerate);
     on('themeSelect', 'change', e => { state.theme = e.target.value; savePrefs(); });
     on('themeSelect2', 'change', e => { state.theme = e.target.value; savePrefs(); renderPreview(); });
@@ -1121,12 +1292,14 @@
       const b = document.getElementById('jdInput'); if (b) b.value = '';
       state.jdTitle = ''; state.jd = ''; state.jdImages = [];
       state.effectiveJD = '';
+      resetExperienceSelection();
       const p = document.getElementById('jdImagePreview'); if (p) p.innerHTML = '';
       updateJDCharCount();
     });
     on('clearExp', 'click', () => {
       const e = document.getElementById('expInput'); if (e) e.value = '';
       state.experiences = ''; state.manualExperiences = ''; state.uploadedFiles = [];
+      resetExperienceSelection();
       syncManualProfileFromInputs();
       renderFileList(); updateCharCount();
     });
@@ -1137,18 +1310,20 @@
         const fg = document.getElementById('jdFullGroup'); if (fg) fg.style.display = r.value === 'full' ? '' : 'none';
       });
     });
-    on('jdTitleInput', 'input', () => { state.jdTitle = (document.getElementById('jdTitleInput')?.value || '').trim(); });
+    on('jdTitleInput', 'input', () => { state.jdTitle = (document.getElementById('jdTitleInput')?.value || '').trim(); resetExperienceSelection(); });
     on('jdImageBtn', 'click', () => { const inp = document.getElementById('jdImageInput'); if (inp) inp.click(); });
     on('jdImageInput', 'change', handleJDImageSelect);
-    on('jdInput', 'input', () => { state.jd = document.getElementById('jdInput')?.value || ''; updateJDCharCount(); });
+    on('jdInput', 'input', () => { state.jd = document.getElementById('jdInput')?.value || ''; resetExperienceSelection(); updateJDCharCount(); });
     on('expInput', 'input', () => {
       state.experiences = document.getElementById('expInput')?.value || '';
       state.manualExperiences = state.experiences;
+      resetExperienceSelection();
       syncManualProfileFromInputs();
       updateCharCount();
     });
     on('reqInput', 'input', () => {
       state.requirements = document.getElementById('reqInput')?.value || '';
+      resetExperienceSelection();
       syncManualProfileFromInputs();
     });
     ['profileNameInput', 'profilePhoneInput', 'profileEmailInput', 'profileLinkInput'].forEach(id => {
@@ -1270,6 +1445,66 @@
     if (btn) btn.classList.toggle('needs-key', !!AIService.hasUserApiKey());
   }
 
+  async function analyzeExperienceOptions(force = false) {
+    if (!AIService.hasApiKey()) { openAPIKeyModal(); return false; }
+    state.jdMode = document.querySelector('input[name="jdMode"]:checked')?.value || 'title';
+    state.jdTitle = (document.getElementById('jdTitleInput')?.value || '').trim();
+    state.jd = (document.getElementById('jdInput')?.value || '').trim();
+    state.experiences = (document.getElementById('expInput')?.value || '').trim();
+    state.requirements = (document.getElementById('reqInput')?.value || '').trim();
+    if (!state.jdTitle && !state.jd) { showToast('请先输入岗位名或 JD', 'warning'); return false; }
+    if (!state.experiences) { showToast('请先提供经历素材', 'warning'); return false; }
+    const signature = getExperienceSelectionSignature();
+    if (!force && state.experienceOptions.length && state.experienceSelectionSignature === signature) {
+      renderExperiencePicker();
+      return true;
+    }
+    const btn = document.getElementById('generateBtn');
+    const oldText = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = '分析经历…'; }
+    showToast('正在从素材里拆出可写入简历的经历选项…', 'info');
+    try {
+      const jd = state.jd || ('目标岗位：' + state.jdTitle);
+      const result = await AIService.extractExperienceOptions({
+        jd,
+        experiences: state.experiences,
+        requirements: state.requirements
+      });
+      const normalized = normalizeExperienceOptions(result.raw ? fallbackExperienceOptions(state.experiences) : result);
+      if (!normalized.options.length) throw new Error('NO_OPTIONS');
+      state.experienceOptions = normalized.options;
+      state.selectedExperienceIds = normalized.options.filter(item => item.recommended).map(item => item.id);
+      state.experienceSelectionConfirmed = false;
+      state.experienceSelectionSignature = signature;
+      renderExperiencePicker();
+      document.getElementById('experiencePicker')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      showToast('已推荐一组经历组合，你可以调整后再生成', 'success');
+      return true;
+    } catch (err) {
+      console.error(err);
+      const fallback = fallbackExperienceOptions(state.experiences);
+      state.experienceOptions = fallback.options;
+      state.selectedExperienceIds = fallback.options.filter(item => item.recommended).map(item => item.id);
+      state.experienceSelectionConfirmed = false;
+      state.experienceSelectionSignature = signature;
+      renderExperiencePicker();
+      showToast('AI 分析不稳定，已按段落生成可选经历组合', 'warning');
+      return true;
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = oldText || '生成简历'; }
+    }
+  }
+
+  function confirmExperienceSelectionAndGenerate() {
+    const selected = state.selectedExperienceIds;
+    if (!selected.length) {
+      showToast('至少选择一段经历，否则简历会空', 'warning');
+      return;
+    }
+    state.experienceSelectionConfirmed = true;
+    handleGenerate();
+  }
+
   // ── Generate ──
   async function handleGenerate() {
     if (!AIService.hasApiKey()) { openAPIKeyModal(); return; }
@@ -1283,7 +1518,6 @@
     const portfolioContext = state.portfolioLinks.length
       ? '\n\n--- 作品集链接（第一版仅展示链接，不读取外网内容）---\n' + state.portfolioLinks.join('\n')
       : '';
-    const experiencesForAI = state.experiences + portfolioContext;
     const densityRequirement = [
       '默认生成一页 A4 高密度简历，不要生成半页或留大空白。',
       '优先写教育经历、实习经历、项目经历、创业/校园经历；有公司/岗位/时间的经历必须归入实习经历或工作经历。',
@@ -1297,6 +1531,11 @@
     if (!state.jdTitle && !state.jd) { showToast('请输入岗位名或 JD', 'warning'); return; }
     if (!state.manualProfile.name) { showToast('请先填写姓名', 'warning'); document.getElementById('profileNameInput')?.focus(); return; }
     if (!state.experiences) { showToast('请提供经历素材', 'warning'); return; }
+    const selectionSignature = getExperienceSelectionSignature();
+    if (!state.experienceSelectionConfirmed || state.experienceSelectionSignature !== selectionSignature) {
+      await analyzeExperienceOptions(false);
+      return;
+    }
 
     let effectiveJD = state.jd;
     if (state.jdMode === 'title' && state.jdTitle) {
@@ -1307,6 +1546,11 @@
       effectiveJD += '\n[用户上传了 JD 截图，但当前应用无法读取图片文字；只能依据已输入的岗位名/JD 文本生成。]';
     }
     state.effectiveJD = effectiveJD;
+    const selectedExperienceContext = buildSelectedExperienceContext();
+    const selectedTitles = state.experienceOptions
+      .filter(item => new Set(state.selectedExperienceIds).has(item.id))
+      .map(item => item.title)
+      .join('、');
     trackEvent('generate_start', {
       jdMode: state.jdMode,
       hasFullJD: !!state.jd,
@@ -1330,8 +1574,12 @@
       startGenerateProgressLoop();
       const result = await AIService.generateResume({
         jd: effectiveJD,
-        experiences: experiencesForAI,
-        requirements: [state.requirements, densityRequirement].filter(Boolean).join('\n\n')
+        experiences: selectedExperienceContext + portfolioContext,
+        requirements: [
+          state.requirements,
+          selectedTitles ? '用户已确认本次简历优先写入这些经历：' + selectedTitles + '。不要忽略用户勾选的经历；若页面不足一页，可在完整原始素材中补充未勾选但相关的经历。' : '',
+          densityRequirement
+        ].filter(Boolean).join('\n\n')
       });
       stopGenerateProgressLoop();
       setGenerateProgress(68, '正在解析 AI 返回结果…', false, '解析结果…');
