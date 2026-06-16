@@ -32,7 +32,8 @@
 
 如果你不想使用网页工具，也可以把跃历的简历写作方法直接交给 Agent 使用：
 
-- [Yueli Resume Writer Skill](skills/yueli-resume-writer/SKILL.md)
+- [Yueli Resume Writer Skill](skills/yueli-resume-writer/README.md)
+- [Formal Skill File](skills/yueli-resume-writer/SKILL.md)
 
 这个 Skill 会指导 Agent 按“事实优先 -> 岗位转译 -> 经历筛选 -> STAR 重写 -> 版面校验”的流程写简历，适合产品、运营、市场、咨询、投资人实习生、校招等方向。
 
